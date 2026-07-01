@@ -611,11 +611,12 @@ function Gallery() {
   const [api, setApi] = useState<CarouselApi>();
   const [current, setCurrent] = useState(0);
 
-  useMemo(() => {
+  useEffect(() => {
     if (!api) return;
     setCurrent(api.selectedScrollSnap());
     api.on("select", () => setCurrent(api.selectedScrollSnap()));
   }, [api]);
+
 
   return (
     <section id="gallery" className="bg-royal py-20 text-white md:py-28">

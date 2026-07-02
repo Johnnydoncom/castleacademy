@@ -59,7 +59,7 @@ import {
 } from "@/components/ui/carousel";
 import { cn } from "@/lib/utils";
 
-import logoAsset from "@/assets/castle-academy-logo.asset.json";
+import logoAsset from "@/assets/castle-academy-wordmark.png.asset.json";
 import heroImg from "@/assets/hero-training-room.jpg";
 import g1 from "@/assets/gallery-1.jpg";
 import g2 from "@/assets/gallery-2.jpg";

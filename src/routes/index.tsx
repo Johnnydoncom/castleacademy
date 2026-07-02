@@ -90,27 +90,34 @@ const NAV_LINKS = [
 ];
 
 function Logo({ className, tone = "onLight" }: { className?: string; tone?: "onLight" | "onDark" }) {
-  // Logo has a royal-blue background of its own. On light surfaces we let that
-  // blue field sit naturally in a rounded tile; on dark surfaces we drop it flat.
+  // The wordmark is gold-on-transparent. On light surfaces we drop it into a
+  // noir tile so the gold reads with luxury contrast; on dark it sits naturally.
   if (tone === "onDark") {
     return (
       <img
         src={logoAsset.url}
         alt="The Castle Academy"
-        className={cn("h-12 w-auto rounded-md object-cover", className)}
-        width={192}
-        height={48}
+        className={cn("h-14 w-auto object-contain", className)}
+        width={220}
+        height={72}
       />
     );
   }
   return (
-    <img
-      src={logoAsset.url}
-      alt="The Castle Academy"
-      className={cn("h-11 w-auto rounded-md ring-1 ring-royal-deep/10 object-cover shadow-sm", className)}
-      width={176}
-      height={44}
-    />
+    <span
+      className={cn(
+        "inline-flex items-center justify-center rounded-md bg-royal px-3 py-1.5 shadow-sm ring-1 ring-gold/20",
+        className
+      )}
+    >
+      <img
+        src={logoAsset.url}
+        alt="The Castle Academy"
+        className="h-8 w-auto object-contain"
+        width={140}
+        height={40}
+      />
+    </span>
   );
 }
 

@@ -66,6 +66,14 @@ import g2 from "@/assets/gallery-2.jpg";
 import g3 from "@/assets/gallery-3.jpg";
 import g4 from "@/assets/gallery-4.jpg";
 import g5 from "@/assets/gallery-5.jpg";
+import useCorporate from "@/assets/use-corporate.jpg";
+import useWorkshop from "@/assets/use-workshop.jpg";
+import useSeminar from "@/assets/use-seminar.jpg";
+import useMeeting from "@/assets/use-meeting.jpg";
+import useCourse from "@/assets/use-course.jpg";
+import usePresentation from "@/assets/use-presentation.jpg";
+import useCoaching from "@/assets/use-coaching.jpg";
+import useStrategy from "@/assets/use-strategy.jpg";
 
 export const Route = createFileRoute("/")({
   head: () => ({

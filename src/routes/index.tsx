@@ -130,7 +130,7 @@ function Nav() {
             <a
               key={l.href}
               href={l.href}
-              className="text-sm font-medium text-ink/80 transition-colors hover:text-royal"
+              className="text-sm font-medium text-ink/80 transition-colors hover:text-gold"
             >
               {l.label}
             </a>
@@ -139,7 +139,7 @@ function Nav() {
         <div className="flex items-center gap-3">
           <a
             href="tel:+2340000000000"
-            className="hidden items-center gap-2 text-sm font-medium text-ink/80 hover:text-royal md:inline-flex"
+            className="hidden items-center gap-2 text-sm font-medium text-ink/80 hover:text-gold md:inline-flex"
           >
             <Phone className="h-4 w-4" /> +234 XXX XXX XXXX
           </a>
@@ -170,7 +170,7 @@ function Nav() {
                 key={l.href}
                 href={l.href}
                 onClick={() => setOpen(false)}
-                className="py-2 text-sm font-medium text-ink/80 hover:text-royal"
+                className="py-2 text-sm font-medium text-ink/80 hover:text-gold"
               >
                 {l.label}
               </a>
@@ -282,7 +282,7 @@ function Why() {
       <div className="mx-auto max-w-7xl px-5 md:px-8">
         <div className="flex flex-col items-start justify-between gap-6 md:flex-row md:items-end">
           <div className="max-w-2xl">
-            <p className="text-xs font-medium uppercase tracking-[0.18em] text-royal">
+            <p className="text-xs font-medium uppercase tracking-[0.18em] text-gold">
               Why Castle Academy
             </p>
             <h2 className="mt-3 font-display text-3xl leading-tight text-ink md:text-5xl">
@@ -305,7 +305,7 @@ function Why() {
                 i === 0 && "lg:col-span-2 lg:row-span-1"
               )}
             >
-              <div className="mb-6 inline-flex h-11 w-11 items-center justify-center rounded-xl bg-royal/10 text-royal transition-colors group-hover:bg-gold/15 group-hover:text-gold">
+              <div className="mb-6 inline-flex h-11 w-11 items-center justify-center rounded-xl bg-royal/10 text-gold transition-colors group-hover:bg-gold/15 group-hover:text-gold">
                 <f.icon className="h-5 w-5" strokeWidth={1.75} />
               </div>
               <h3 className="font-display text-xl text-ink">{f.title}</h3>
@@ -398,7 +398,7 @@ function Pricing() {
     <section id="pricing" className="bg-ivory py-20 md:py-28">
       <div className="mx-auto max-w-6xl px-5 md:px-8">
         <div className="mx-auto max-w-2xl text-center">
-          <p className="text-xs font-medium uppercase tracking-[0.18em] text-royal">
+          <p className="text-xs font-medium uppercase tracking-[0.18em] text-gold">
             Simple, honest pricing
           </p>
           <h2 className="mt-3 font-display text-3xl leading-tight text-ink md:text-5xl">
@@ -498,7 +498,7 @@ function How() {
     <section id="how" className="bg-cream py-20 md:py-28">
       <div className="mx-auto max-w-7xl px-5 md:px-8">
         <div className="max-w-2xl">
-          <p className="text-xs font-medium uppercase tracking-[0.18em] text-royal">
+          <p className="text-xs font-medium uppercase tracking-[0.18em] text-gold">
             How to book
           </p>
           <h2 className="mt-3 font-display text-3xl leading-tight text-ink md:text-5xl">
@@ -548,7 +548,7 @@ function Availability() {
     <section id="availability" className="bg-ivory py-20 md:py-28">
       <div className="mx-auto grid max-w-7xl gap-12 px-5 md:grid-cols-[1fr_1.1fr] md:px-8">
         <div className="flex flex-col justify-center">
-          <p className="text-xs font-medium uppercase tracking-[0.18em] text-royal">
+          <p className="text-xs font-medium uppercase tracking-[0.18em] text-gold">
             Live availability
           </p>
           <h2 className="mt-3 font-display text-3xl leading-tight text-ink md:text-5xl">
@@ -982,7 +982,7 @@ function Location() {
     <section className="bg-ivory py-20 md:py-28">
       <div className="mx-auto grid max-w-7xl gap-10 px-5 md:grid-cols-2 md:px-8">
         <div className="flex flex-col justify-center">
-          <p className="text-xs font-medium uppercase tracking-[0.18em] text-royal">
+          <p className="text-xs font-medium uppercase tracking-[0.18em] text-gold">
             Find us
           </p>
           <h2 className="mt-3 font-display text-3xl leading-tight text-ink md:text-5xl">
@@ -990,7 +990,7 @@ function Location() {
           </h2>
           <div className="mt-6 space-y-4 text-sm text-ink/85">
             <div className="flex items-start gap-3">
-              <MapPin className="mt-0.5 h-4 w-4 text-royal" />
+              <MapPin className="mt-0.5 h-4 w-4 text-gold" />
               <span>
                 Castle Academy Training Venue
                 <br />
@@ -998,11 +998,11 @@ function Location() {
               </span>
             </div>
             <div className="flex items-start gap-3">
-              <Phone className="mt-0.5 h-4 w-4 text-royal" />
+              <Phone className="mt-0.5 h-4 w-4 text-gold" />
               <span>+234 XXX XXX XXXX (WhatsApp enabled)</span>
             </div>
             <div className="flex items-start gap-3">
-              <Mail className="mt-0.5 h-4 w-4 text-royal" />
+              <Mail className="mt-0.5 h-4 w-4 text-gold" />
               <span>bookings@castleacademy.ng</span>
             </div>
           </div>
@@ -1025,7 +1025,7 @@ function Assistance() {
   return (
     <section className="bg-cream py-16 md:py-20">
       <div className="mx-auto max-w-4xl px-5 text-center md:px-8">
-        <p className="text-xs font-medium uppercase tracking-[0.18em] text-royal">
+        <p className="text-xs font-medium uppercase tracking-[0.18em] text-gold">
           Need assistance?
         </p>
         <h2 className="mt-3 font-display text-3xl leading-tight text-ink md:text-4xl">
@@ -1049,7 +1049,7 @@ function Assistance() {
             asChild
             size="lg"
             variant="outline"
-            className="rounded-full border-royal/30 bg-transparent text-royal hover:bg-royal/5"
+            className="rounded-full border-gold/30 bg-transparent text-gold hover:bg-royal/5"
           >
             <a href="mailto:bookings@castleacademy.ng">
               <Mail className="mr-2 h-4 w-4" /> Email bookings

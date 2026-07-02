@@ -152,7 +152,7 @@ function Nav() {
           </a>
           <Button
             asChild
-            className="rounded-full bg-royal text-primary-foreground hover:bg-royal-deep"
+            className="rounded-none bg-gold px-6 text-royal-deep hover:bg-gold-soft"
           >
             <a href="#book">Book Now</a>
           </Button>

@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -24,14 +24,6 @@ import {
   Volume2,
   Tv,
   Wand2,
-  BookOpen,
-  Briefcase,
-  Building2,
-  Compass,
-  GraduationCap,
-  Handshake,
-  Presentation,
-  Lightbulb,
   Star,
   Clock,
 } from "lucide-react";
@@ -66,6 +58,14 @@ import g2 from "@/assets/gallery-2.jpg";
 import g3 from "@/assets/gallery-3.jpg";
 import g4 from "@/assets/gallery-4.jpg";
 import g5 from "@/assets/gallery-5.jpg";
+import useCorporate from "@/assets/use-corporate.jpg";
+import useWorkshop from "@/assets/use-workshop.jpg";
+import useSeminar from "@/assets/use-seminar.jpg";
+import useMeeting from "@/assets/use-meeting.jpg";
+import useCourse from "@/assets/use-course.jpg";
+import usePresentation from "@/assets/use-presentation.jpg";
+import useCoaching from "@/assets/use-coaching.jpg";
+import useStrategy from "@/assets/use-strategy.jpg";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -123,65 +123,78 @@ function Logo({ className, tone = "onLight" }: { className?: string; tone?: "onL
 
 function Nav() {
   const [open, setOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 8);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
   return (
-    <header className="sticky top-0 z-40 border-b border-border/60 bg-ivory/85 backdrop-blur-md">
-      <div className="mx-auto flex max-w-7xl items-center justify-between gap-6 px-5 py-3 md:px-8">
-        <a href="#top" className="flex items-center gap-3">
-          <Logo />
-          <span className="hidden text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground sm:inline">
-            Training Space · Lekki
-          </span>
+    <header
+      className={cn(
+        "sticky top-0 z-40 transition-all duration-300",
+        scrolled
+          ? "border-b border-gold/20 bg-royal-deep/95 backdrop-blur-xl shadow-lg shadow-royal-deep/20"
+          : "border-b border-transparent bg-royal-deep"
+      )}
+    >
+      <div className="h-px w-full bg-gradient-to-r from-transparent via-gold/60 to-transparent" />
+      <div className="mx-auto flex max-w-7xl items-center justify-between gap-6 px-5 py-4 md:px-8 md:py-5">
+        <a href="#top" className="flex items-center gap-3 group">
+          <Logo tone="onDark" className="h-10 md:h-12" />
         </a>
-        <nav className="hidden items-center gap-8 md:flex">
+        <nav className="hidden items-center gap-10 md:flex">
           {NAV_LINKS.map((l) => (
             <a
               key={l.href}
               href={l.href}
-              className="text-sm font-medium text-ink/80 transition-colors hover:text-gold"
+              className="relative text-[13px] font-medium uppercase tracking-[0.16em] text-white/70 transition-colors hover:text-gold after:absolute after:-bottom-1.5 after:left-1/2 after:h-px after:w-0 after:bg-gold after:transition-all after:duration-300 hover:after:left-0 hover:after:w-full"
             >
               {l.label}
             </a>
           ))}
         </nav>
         <div className="flex items-center gap-3">
-          <a
-            href="tel:+2340000000000"
-            className="hidden items-center gap-2 text-sm font-medium text-ink/80 hover:text-gold md:inline-flex"
-          >
-            <Phone className="h-4 w-4" /> +234 XXX XXX XXXX
-          </a>
           <Button
             asChild
-            className="rounded-none bg-gold px-6 text-royal-deep hover:bg-gold-soft"
+            className="hidden rounded-none border border-gold bg-transparent px-6 text-[12px] font-medium uppercase tracking-[0.18em] text-gold transition-all hover:bg-gold hover:text-royal-deep md:inline-flex"
           >
-            <a href="#book">Book Now</a>
+            <a href="#book">Reserve · Book Now</a>
           </Button>
           <button
-            className="rounded-md border border-border p-2 md:hidden"
+            className="rounded-md border border-white/20 p-2 text-white md:hidden"
             onClick={() => setOpen((v) => !v)}
             aria-label="Toggle menu"
           >
             <div className="space-y-1">
-              <span className="block h-0.5 w-4 bg-ink" />
-              <span className="block h-0.5 w-4 bg-ink" />
-              <span className="block h-0.5 w-4 bg-ink" />
+              <span className="block h-0.5 w-4 bg-white" />
+              <span className="block h-0.5 w-4 bg-white" />
+              <span className="block h-0.5 w-4 bg-white" />
             </div>
           </button>
         </div>
       </div>
       {open && (
-        <div className="border-t border-border bg-ivory md:hidden">
+        <div className="border-t border-gold/20 bg-royal-deep md:hidden">
           <div className="mx-auto flex max-w-7xl flex-col px-5 py-3">
             {NAV_LINKS.map((l) => (
               <a
                 key={l.href}
                 href={l.href}
                 onClick={() => setOpen(false)}
-                className="py-2 text-sm font-medium text-ink/80 hover:text-gold"
+                className="py-2 text-sm font-medium uppercase tracking-[0.14em] text-white/80 hover:text-gold"
               >
                 {l.label}
               </a>
             ))}
+            <a
+              href="#book"
+              onClick={() => setOpen(false)}
+              className="mt-3 inline-flex items-center justify-center border border-gold px-6 py-2.5 text-[12px] font-medium uppercase tracking-[0.18em] text-gold hover:bg-gold hover:text-royal-deep"
+            >
+              Reserve · Book Now
+            </a>
           </div>
         </div>
       )}
@@ -229,7 +242,7 @@ function Hero() {
               variant="outline"
               className="rounded-full border-white/30 bg-transparent px-7 text-white hover:bg-white/10 hover:text-white"
             >
-              <a href="#availability">Check Availability</a>
+              <a href="#gallery">Explore the Space</a>
             </Button>
           </div>
           <div className="mt-10 flex flex-wrap items-center gap-x-6 gap-y-3 text-xs text-white/70">
@@ -348,49 +361,77 @@ function Why() {
 /* ---------------- Perfect For ---------------- */
 
 const USE_CASES = [
-  { icon: Briefcase, label: "Corporate Trainings" },
-  { icon: BookOpen, label: "Workshops" },
-  { icon: Presentation, label: "Seminars" },
-  { icon: Handshake, label: "Team Meetings" },
-  { icon: GraduationCap, label: "Professional Courses" },
-  { icon: Building2, label: "Business Presentations" },
-  { icon: Lightbulb, label: "Coaching Sessions" },
-  { icon: Compass, label: "Strategy Sessions" },
+  { img: useCorporate, label: "Corporate Trainings", body: "Onboarding, compliance and leadership programs — delivered with polish." },
+  { img: useWorkshop, label: "Workshops", body: "Hands-on sessions with room to build, sketch and think out loud." },
+  { img: useSeminar, label: "Seminars", body: "Speaker-led events with premium AV and attentive hosting." },
+  { img: useMeeting, label: "Team Meetings", body: "Focused, distraction-free space for high-stakes conversations." },
+  { img: useCourse, label: "Professional Courses", body: "Multi-day cohorts and certifications in a room built to teach." },
+  { img: usePresentation, label: "Business Presentations", body: "Pitch, launch and demo on a large 4K screen with cinema-grade sound." },
+  { img: useCoaching, label: "Coaching Sessions", body: "Small, private setups for one-on-one and executive coaching." },
+  { img: useStrategy, label: "Strategy Sessions", body: "Whiteboards, walls and quiet — where big decisions get made." },
 ];
 
 function PerfectFor() {
   return (
-    <section className="bg-royal-deep py-20 text-white md:py-28">
-      <div className="mx-auto max-w-7xl px-5 md:px-8">
-        <div className="max-w-2xl">
-          <p className="text-xs font-medium uppercase tracking-[0.18em] text-gold">
-            Perfect for
+    <section className="relative overflow-hidden bg-royal-deep py-20 text-white md:py-28">
+      <div className="pointer-events-none absolute inset-0 opacity-40 grain" />
+      <div className="relative mx-auto max-w-7xl px-5 md:px-8">
+        <div className="flex flex-col items-start justify-between gap-8 md:flex-row md:items-end">
+          <div className="max-w-2xl">
+            <p className="text-xs font-medium uppercase tracking-[0.18em] text-gold">
+              Perfect for
+            </p>
+            <h2 className="mt-3 font-display text-3xl leading-tight md:text-5xl">
+              Whatever you're bringing to the room, we've hosted it{" "}
+              <span className="text-gold">beautifully</span>.
+            </h2>
+          </div>
+          <p className="max-w-sm text-sm leading-relaxed text-white/60">
+            A single room. Eight ways it disappears into the background and
+            lets your work take centre stage.
           </p>
-          <h2 className="mt-3 font-display text-3xl leading-tight md:text-5xl">
-            Whatever you're bringing to the room, we've hosted it{" "}
-            <span className="text-gold">beautifully</span>.
-          </h2>
         </div>
 
-        <div className="mt-14 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-14 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
           {USE_CASES.map((u, i) => (
-            <div
+            <a
               key={u.label}
+              href="#book"
               className={cn(
-                "group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] p-6 transition-all hover:-translate-y-1 hover:border-gold/40 hover:bg-white/[0.06]",
-                i === 0 && "lg:col-span-2 lg:row-span-2 lg:min-h-[280px]"
+                "group relative isolate flex flex-col justify-end overflow-hidden border border-white/10 transition-all duration-500 hover:border-gold/60",
+                i === 0 && "lg:col-span-2 lg:row-span-2"
               )}
             >
-              <u.icon className="h-6 w-6 text-gold" strokeWidth={1.5} />
-              <div className="mt-10">
-                <div className="text-[11px] uppercase tracking-[0.18em] text-white/50">
-                  0{i + 1}
-                </div>
-                <div className="mt-1 font-display text-xl text-white md:text-2xl">
-                  {u.label}
-                </div>
+              <div className={cn("relative w-full overflow-hidden", i === 0 ? "aspect-[4/5] lg:aspect-auto lg:h-full lg:min-h-[560px]" : "aspect-[4/5]")}>
+                <img
+                  src={u.img}
+                  alt={u.label}
+                  loading="lazy"
+                  width={800}
+                  height={1000}
+                  className="absolute inset-0 h-full w-full object-cover transition-transform duration-[900ms] ease-out group-hover:scale-105"
+                />
+                {/* dark gradient overlay */}
+                <div className="absolute inset-0 bg-gradient-to-t from-royal-deep via-royal-deep/50 to-royal-deep/10" />
+                {/* gold hairline frame on hover */}
+                <div className="pointer-events-none absolute inset-2 border border-gold/0 transition-colors duration-500 group-hover:border-gold/40" />
               </div>
-            </div>
+              <div className="absolute inset-x-0 bottom-0 p-6">
+                <div className="flex items-baseline gap-3 text-[11px] uppercase tracking-[0.2em] text-gold/80">
+                  <span>{String(i + 1).padStart(2, "0")}</span>
+                  <span className="h-px flex-1 bg-gold/30" />
+                </div>
+                <h3 className={cn("mt-2 font-display text-white", i === 0 ? "text-3xl md:text-4xl" : "text-xl md:text-2xl")}>
+                  {u.label}
+                </h3>
+                <p className={cn(
+                  "mt-2 text-sm leading-relaxed text-white/70 transition-all duration-500",
+                  i === 0 ? "max-w-md opacity-100" : "max-h-0 overflow-hidden opacity-0 group-hover:max-h-32 group-hover:opacity-100"
+                )}>
+                  {u.body}
+                </p>
+              </div>
+            </a>
           ))}
         </div>
       </div>
@@ -537,72 +578,6 @@ function How() {
   );
 }
 
-/* ---------------- Live Availability ---------------- */
-
-function Availability() {
-  const [month, setMonth] = useState(new Date());
-  // demo occupancy — visual only
-  const booked = useMemo(() => {
-    const base = new Date();
-    return [3, 7, 11, 18, 24].map((d) => new Date(base.getFullYear(), base.getMonth(), d));
-  }, []);
-  const limited = useMemo(() => {
-    const base = new Date();
-    return [5, 12, 20].map((d) => new Date(base.getFullYear(), base.getMonth(), d));
-  }, []);
-
-  return (
-    <section id="availability" className="bg-ivory py-20 md:py-28">
-      <div className="mx-auto grid max-w-7xl gap-12 px-5 md:grid-cols-[1fr_1.1fr] md:px-8">
-        <div className="flex flex-col justify-center">
-          <p className="text-xs font-medium uppercase tracking-[0.18em] text-gold">
-            Live availability
-          </p>
-          <h2 className="mt-3 font-display text-3xl leading-tight text-ink md:text-5xl">
-            See what's open <span className="text-gold">this month</span>.
-          </h2>
-          <p className="mt-4 max-w-md text-sm leading-relaxed text-muted-foreground">
-            Real-time sync with our booking system — no double-bookings, no back-and-forth
-            emails. Pick a day that works and lock it in.
-          </p>
-          <div className="mt-8 space-y-3 text-sm">
-            <Legend swatch="bg-emerald-500" label="Available" />
-            <Legend swatch="bg-gold" label="Limited slots" />
-            <Legend swatch="bg-royal" label="Booked" />
-          </div>
-          <Button
-            asChild
-            className="mt-8 w-fit rounded-full bg-royal text-primary-foreground hover:bg-royal-deep"
-          >
-            <a href="#book">Request a date</a>
-          </Button>
-        </div>
-        <div className="rounded-3xl border border-border bg-cream p-4 shadow-xl shadow-royal/5 sm:p-6">
-          <Calendar
-            mode="single"
-            month={month}
-            onMonthChange={setMonth}
-            className="pointer-events-auto mx-auto"
-            modifiers={{ booked, limited }}
-            modifiersClassNames={{
-              booked: "bg-royal text-white hover:bg-royal",
-              limited: "bg-gold/20 text-royal-deep",
-            }}
-          />
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function Legend({ swatch, label }: { swatch: string; label: string }) {
-  return (
-    <div className="flex items-center gap-3">
-      <span className={cn("inline-block h-3 w-3 rounded-full", swatch)} />
-      <span className="text-ink/80">{label}</span>
-    </div>
-  );
-}
 
 /* ---------------- Gallery ---------------- */
 
@@ -1157,7 +1132,7 @@ function Landing() {
         <PerfectFor />
         <Pricing />
         <How />
-        <Availability />
+        
         <Gallery />
         <Booking />
         <Testimonials />

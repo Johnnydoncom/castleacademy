@@ -361,49 +361,77 @@ function Why() {
 /* ---------------- Perfect For ---------------- */
 
 const USE_CASES = [
-  { icon: Briefcase, label: "Corporate Trainings" },
-  { icon: BookOpen, label: "Workshops" },
-  { icon: Presentation, label: "Seminars" },
-  { icon: Handshake, label: "Team Meetings" },
-  { icon: GraduationCap, label: "Professional Courses" },
-  { icon: Building2, label: "Business Presentations" },
-  { icon: Lightbulb, label: "Coaching Sessions" },
-  { icon: Compass, label: "Strategy Sessions" },
+  { img: useCorporate, label: "Corporate Trainings", body: "Onboarding, compliance and leadership programs — delivered with polish." },
+  { img: useWorkshop, label: "Workshops", body: "Hands-on sessions with room to build, sketch and think out loud." },
+  { img: useSeminar, label: "Seminars", body: "Speaker-led events with premium AV and attentive hosting." },
+  { img: useMeeting, label: "Team Meetings", body: "Focused, distraction-free space for high-stakes conversations." },
+  { img: useCourse, label: "Professional Courses", body: "Multi-day cohorts and certifications in a room built to teach." },
+  { img: usePresentation, label: "Business Presentations", body: "Pitch, launch and demo on a large 4K screen with cinema-grade sound." },
+  { img: useCoaching, label: "Coaching Sessions", body: "Small, private setups for one-on-one and executive coaching." },
+  { img: useStrategy, label: "Strategy Sessions", body: "Whiteboards, walls and quiet — where big decisions get made." },
 ];
 
 function PerfectFor() {
   return (
-    <section className="bg-royal-deep py-20 text-white md:py-28">
-      <div className="mx-auto max-w-7xl px-5 md:px-8">
-        <div className="max-w-2xl">
-          <p className="text-xs font-medium uppercase tracking-[0.18em] text-gold">
-            Perfect for
+    <section className="relative overflow-hidden bg-royal-deep py-20 text-white md:py-28">
+      <div className="pointer-events-none absolute inset-0 opacity-40 grain" />
+      <div className="relative mx-auto max-w-7xl px-5 md:px-8">
+        <div className="flex flex-col items-start justify-between gap-8 md:flex-row md:items-end">
+          <div className="max-w-2xl">
+            <p className="text-xs font-medium uppercase tracking-[0.18em] text-gold">
+              Perfect for
+            </p>
+            <h2 className="mt-3 font-display text-3xl leading-tight md:text-5xl">
+              Whatever you're bringing to the room, we've hosted it{" "}
+              <span className="text-gold">beautifully</span>.
+            </h2>
+          </div>
+          <p className="max-w-sm text-sm leading-relaxed text-white/60">
+            A single room. Eight ways it disappears into the background and
+            lets your work take centre stage.
           </p>
-          <h2 className="mt-3 font-display text-3xl leading-tight md:text-5xl">
-            Whatever you're bringing to the room, we've hosted it{" "}
-            <span className="text-gold">beautifully</span>.
-          </h2>
         </div>
 
-        <div className="mt-14 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-14 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
           {USE_CASES.map((u, i) => (
-            <div
+            <a
               key={u.label}
+              href="#book"
               className={cn(
-                "group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] p-6 transition-all hover:-translate-y-1 hover:border-gold/40 hover:bg-white/[0.06]",
-                i === 0 && "lg:col-span-2 lg:row-span-2 lg:min-h-[280px]"
+                "group relative isolate flex flex-col justify-end overflow-hidden border border-white/10 transition-all duration-500 hover:border-gold/60",
+                i === 0 && "lg:col-span-2 lg:row-span-2"
               )}
             >
-              <u.icon className="h-6 w-6 text-gold" strokeWidth={1.5} />
-              <div className="mt-10">
-                <div className="text-[11px] uppercase tracking-[0.18em] text-white/50">
-                  0{i + 1}
-                </div>
-                <div className="mt-1 font-display text-xl text-white md:text-2xl">
-                  {u.label}
-                </div>
+              <div className={cn("relative w-full overflow-hidden", i === 0 ? "aspect-[4/5] lg:aspect-auto lg:h-full lg:min-h-[560px]" : "aspect-[4/5]")}>
+                <img
+                  src={u.img}
+                  alt={u.label}
+                  loading="lazy"
+                  width={800}
+                  height={1000}
+                  className="absolute inset-0 h-full w-full object-cover transition-transform duration-[900ms] ease-out group-hover:scale-105"
+                />
+                {/* dark gradient overlay */}
+                <div className="absolute inset-0 bg-gradient-to-t from-royal-deep via-royal-deep/50 to-royal-deep/10" />
+                {/* gold hairline frame on hover */}
+                <div className="pointer-events-none absolute inset-2 border border-gold/0 transition-colors duration-500 group-hover:border-gold/40" />
               </div>
-            </div>
+              <div className="absolute inset-x-0 bottom-0 p-6">
+                <div className="flex items-baseline gap-3 text-[11px] uppercase tracking-[0.2em] text-gold/80">
+                  <span>{String(i + 1).padStart(2, "0")}</span>
+                  <span className="h-px flex-1 bg-gold/30" />
+                </div>
+                <h3 className={cn("mt-2 font-display text-white", i === 0 ? "text-3xl md:text-4xl" : "text-xl md:text-2xl")}>
+                  {u.label}
+                </h3>
+                <p className={cn(
+                  "mt-2 text-sm leading-relaxed text-white/70 transition-all duration-500",
+                  i === 0 ? "max-w-md opacity-100" : "max-h-0 overflow-hidden opacity-0 group-hover:max-h-32 group-hover:opacity-100"
+                )}>
+                  {u.body}
+                </p>
+              </div>
+            </a>
           ))}
         </div>
       </div>

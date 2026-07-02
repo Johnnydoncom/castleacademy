@@ -242,7 +242,7 @@ function Hero() {
               variant="outline"
               className="rounded-full border-white/30 bg-transparent px-7 text-white hover:bg-white/10 hover:text-white"
             >
-              <a href="#availability">Check Availability</a>
+              <a href="#gallery">Explore the Space</a>
             </Button>
           </div>
           <div className="mt-10 flex flex-wrap items-center gap-x-6 gap-y-3 text-xs text-white/70">

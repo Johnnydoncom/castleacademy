@@ -25,7 +25,6 @@ import {
   Tv,
   Wand2,
   Star,
-  Star,
   Clock,
 } from "lucide-react";
 

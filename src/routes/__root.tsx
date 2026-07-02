@@ -86,7 +86,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
           "Book Castle Academy — a modern, fully equipped training venue in Lekki, Lagos. Seats 24, smart TV, high-speed Wi-Fi, uninterrupted power. Hassle-free bookings from ₦100,000.",
       },
       { name: "author", content: "Castle Academy" },
-      { property: "og:title", content: "Castle Academy | Premium Training Space in Lekki, Lagos" },
+      { property: "og:title", content: "Castle Academy | Premium Training Space Booking, Lekki Lagos" },
       {
         property: "og:description",
         content:
@@ -94,6 +94,12 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: "Castle Academy | Premium Training Space Booking, Lekki Lagos" },
+      { name: "description", content: "Book professional training spaces in Nigeria with Castle Spaces Pro for seamless event planning." },
+      { property: "og:description", content: "Book professional training spaces in Nigeria with Castle Spaces Pro for seamless event planning." },
+      { name: "twitter:description", content: "Book professional training spaces in Nigeria with Castle Spaces Pro for seamless event planning." },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/5f1db1d4-e9e5-4952-b47e-92aa1ce2a4cc/id-preview-107d77e7--16880686-f885-4891-a281-8418e17cabd2.lovable.app-1783026353081.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/5f1db1d4-e9e5-4952-b47e-92aa1ce2a4cc/id-preview-107d77e7--16880686-f885-4891-a281-8418e17cabd2.lovable.app-1783026353081.png" },
     ],
     links: [
       { rel: "stylesheet", href: appCss },

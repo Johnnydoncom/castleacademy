@@ -1140,7 +1140,7 @@ function Landing() {
         <PerfectFor />
         <Pricing />
         <How />
-        <Availability />
+        
         <Gallery />
         <Booking />
         <Testimonials />

@@ -5,8 +5,9 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
-import { format } from "date-fns";
+import { format, isBefore, startOfDay } from "date-fns";
 import { CalendarIcon, Clock, MessageCircle, ShieldCheck } from "lucide-react";
+import type { DateRange } from "react-day-picker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -22,23 +23,33 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Field } from "@/components/field";
 import { cn } from "@/lib/utils";
 
-const bookingSchema = z.object({
-  fullName: z.string().min(2, "Please enter your full name"),
-  organisation: z.string().optional(),
-  phone: z.string().min(7, "Please enter a valid Nigerian phone number"),
-  email: z.string().email("Please enter a valid email address"),
-  eventType: z.enum(["training", "workshop", "seminar", "meeting", "coaching", "other"], {
-    message: "Please choose an event type",
-  }),
-  date: z.date({ message: "Please pick a date" }),
-  startTime: z.string().min(1, "Start time required"),
-  endTime: z.string().min(1, "End time required"),
-  participants: z.coerce
-    .number({ message: "Please enter a number" })
-    .min(1, "At least 1 participant")
-    .max(24, "Our room seats up to 24"),
-  requirements: z.string().optional(),
-});
+const bookingSchema = z
+  .object({
+    fullName: z.string().min(2, "Please enter your full name"),
+    organisation: z.string().optional(),
+    phone: z.string().min(7, "Please enter a valid Nigerian phone number"),
+    email: z.string().email("Please enter a valid email address"),
+    eventType: z.enum(["training", "workshop", "seminar", "meeting", "coaching", "other"], {
+      message: "Please choose an event type",
+    }),
+    startDate: z.date({ message: "Please pick a start date" }),
+    startTime: z.string().min(1, "Start time required"),
+    endDate: z.date({ message: "Please pick an end date" }),
+    endTime: z.string().min(1, "End time required"),
+    participants: z.coerce
+      .number({ message: "Please enter a number" })
+      .min(1, "At least 1 participant")
+      .max(24, "Our room seats up to 24"),
+    requirements: z.string().optional(),
+  })
+  .refine(
+    (data) =>
+      !isBefore(startOfDay(data.endDate), startOfDay(data.startDate)),
+    {
+      message: "End date cannot be before start date",
+      path: ["endDate"],
+    }
+  );
 
 type BookingValues = z.infer<typeof bookingSchema>;
 
@@ -46,6 +57,7 @@ const SCRIPT_URL = process.env.NEXT_PUBLIC_GOOGLE_SCRIPT_URL;
 
 export function Booking() {
   const [submitSuccess, setSubmitSuccess] = useState(false);
+  const [dateRange, setDateRange] = useState<DateRange | undefined>();
 
   const {
     register,
@@ -59,17 +71,34 @@ export function Booking() {
     defaultValues: { participants: 12 },
   });
 
-  const date = watch("date");
+  const startDate = watch("startDate");
+  const endDate = watch("endDate");
   const eventType = watch("eventType");
+
+  const handleDateRangeSelect = (range: DateRange | undefined) => {
+    setDateRange(range);
+    if (range?.from) setValue("startDate", range.from, { shouldValidate: true });
+    if (range?.to) setValue("endDate", range.to, { shouldValidate: true });
+    // If user picks same day twice, endDate equals startDate (valid single-day booking)
+    if (range?.from && !range?.to) setValue("endDate", range.from, { shouldValidate: false });
+  };
+
+  const formatDateRange = () => {
+    if (!startDate) return null;
+    if (!endDate || startDate.toDateString() === endDate.toDateString()) {
+      return format(startDate, "PPP");
+    }
+    return `${format(startDate, "PP")} → ${format(endDate, "PP")}`;
+  };
 
   const onSubmit = async (values: BookingValues) => {
     const payload = {
       ...values,
-      date: format(values.date, "yyyy-MM-dd"),
+      startDate: format(values.startDate, "yyyy-MM-dd"),
+      endDate: format(values.endDate, "yyyy-MM-dd"),
     };
 
     if (!SCRIPT_URL) {
-      // Dev-mode fallback — no script URL configured yet
       console.warn("[Booking] NEXT_PUBLIC_GOOGLE_SCRIPT_URL is not set. Logging payload:", payload);
       await new Promise((r) => setTimeout(r, 700));
     } else {
@@ -90,6 +119,7 @@ export function Booking() {
     }
 
     setSubmitSuccess(true);
+    setDateRange(undefined);
     toast.success("Space reserved!", {
       description:
         "We'll send confirmation + payment instructions to your email and WhatsApp shortly.",
@@ -144,7 +174,9 @@ export function Booking() {
                   ✅ Your booking request has been received! We&apos;ll be in touch shortly.
                 </div>
               )}
+
               <div className="grid gap-5 sm:grid-cols-2">
+                {/* Contact info */}
                 <Field label="Full name" error={errors.fullName?.message}>
                   <Input id="fullName" placeholder="Adaeze Okafor" {...register("fullName")} aria-required="true" />
                 </Field>
@@ -158,6 +190,7 @@ export function Booking() {
                   <Input id="email" type="email" placeholder="you@company.com" {...register("email")} aria-required="true" />
                 </Field>
 
+                {/* Event type */}
                 <Field label="Event type" error={errors.eventType?.message}>
                   <Select
                     value={eventType}
@@ -179,43 +212,7 @@ export function Booking() {
                   </Select>
                 </Field>
 
-                <Field label="Preferred date" error={errors.date?.message}>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        id="date"
-                        type="button"
-                        variant="outline"
-                        className={cn(
-                          "w-full justify-start bg-background text-left font-normal",
-                          !date && "text-muted-foreground"
-                        )}
-                        aria-required="true"
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" aria-hidden="true" />
-                        {date ? format(date, "PPP") : "Pick a date"}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent align="start" className="w-auto p-0">
-                      <Calendar
-                        mode="single"
-                        selected={date}
-                        onSelect={(d) => d && setValue("date", d, { shouldValidate: true })}
-                        initialFocus
-                        className={cn("p-3 pointer-events-auto")}
-                        disabled={{ before: new Date() }}
-                      />
-                    </PopoverContent>
-                  </Popover>
-                </Field>
-
-                <Field label="Start time" error={errors.startTime?.message}>
-                  <Input id="startTime" type="time" {...register("startTime")} aria-required="true" />
-                </Field>
-                <Field label="End time" error={errors.endTime?.message}>
-                  <Input id="endTime" type="time" {...register("endTime")} aria-required="true" />
-                </Field>
-
+                {/* Expected participants */}
                 <Field
                   label="Expected participants"
                   error={errors.participants?.message}
@@ -223,6 +220,57 @@ export function Booking() {
                 >
                   <Input id="participants" type="number" min={1} max={24} {...register("participants")} aria-required="true" />
                 </Field>
+
+                {/* Date range — full width */}
+                <div className="sm:col-span-2">
+                  <Field
+                    label="Event dates"
+                    error={errors.startDate?.message ?? errors.endDate?.message}
+                    hint="single or multi-day"
+                  >
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          id="dateRange"
+                          type="button"
+                          variant="outline"
+                          className={cn(
+                            "w-full h-12 justify-start bg-background text-left font-normal",
+                            !startDate && "text-muted-foreground"
+                          )}
+                          aria-required="true"
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4 shrink-0" aria-hidden="true" />
+                          {formatDateRange() ?? "Pick start → end date"}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent align="start" className="w-auto p-0">
+                        <Calendar
+                          mode="range"
+                          selected={dateRange}
+                          onSelect={handleDateRangeSelect}
+                          initialFocus
+                          numberOfMonths={2}
+                          className="p-3 pointer-events-auto"
+                          disabled={{ before: new Date() }}
+                        />
+                        <p className="border-t px-4 py-2 text-[11px] text-muted-foreground">
+                          Click a single day for a same-day booking, or drag to select a range.
+                        </p>
+                      </PopoverContent>
+                    </Popover>
+                  </Field>
+                </div>
+
+                {/* Start time / End time */}
+                <Field label="Start time" error={errors.startTime?.message}>
+                  <Input id="startTime" type="time" {...register("startTime")} aria-required="true" />
+                </Field>
+                <Field label="End time" error={errors.endTime?.message}>
+                  <Input id="endTime" type="time" {...register("endTime")} aria-required="true" />
+                </Field>
+
+                {/* Additional requirements */}
                 <div className="sm:col-span-2">
                   <Field label="Additional requirements" hint="optional">
                     <Textarea

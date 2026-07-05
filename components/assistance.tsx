@@ -21,7 +21,7 @@ export function Assistance() {
             size="lg"
             className="rounded-full bg-royal text-primary-foreground hover:bg-royal-deep"
           >
-            <a href="https://wa.me/2340000000000" target="_blank" rel="noreferrer noopener" aria-label="Chat with us on WhatsApp">
+            <a href="https://wa.me/2349042222296" target="_blank" rel="noreferrer noopener" aria-label="Chat with us on WhatsApp">
               <MessageCircle className="mr-2 h-4 w-4" aria-hidden="true" /> Chat on WhatsApp
             </a>
           </Button>

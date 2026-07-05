@@ -15,7 +15,7 @@ export function Footer() {
         <div>
           <Logo tone="onDark" className="h-14" />
           <p className="mt-4 max-w-sm text-sm leading-relaxed text-white/70">
-            A modern, fully equipped training venue in Lekki, Lagos — built for
+            A modern, fully equipped training venue in Adeniyi Jones, Ikeja, Lagos — built for
             HR teams, trainers and organisations that expect the best.
           </p>
         </div>
@@ -39,8 +39,8 @@ export function Footer() {
           </div>
           <ul className="mt-4 space-y-2 text-sm text-white/75">
             <li>
-              <a href="tel:+2340000000000" className="hover:text-gold transition-colors">
-                +234 XXX XXX XXXX
+              <a href="tel:+2349042222296" className="hover:text-gold transition-colors">
+                +234 904 222 2296
               </a>
             </li>
             <li>
@@ -48,7 +48,7 @@ export function Footer() {
                 bookings@castleacademy.ng
               </a>
             </li>
-            <li>Lekki Phase 1, Lagos</li>
+            <li>Adeniyi Jones, Ikeja, Lagos</li>
           </ul>
         </div>
       </div>

@@ -18,7 +18,7 @@ const GALLERY = [
   { src: "/images/gallery-2.jpg", caption: "Smart TV & presentation wall" },
   { src: "/images/gallery-3.jpg", caption: "Guest lounge & coffee station" },
   { src: "/images/gallery-4.jpg", caption: "Strategy sessions in action" },
-  { src: "/images/gallery-5.jpg", caption: "Our home in Lekki, Lagos" },
+  { src: "/images/gallery-5.jpg", caption: "Our home in Adeniyi Jones, Ikeja" },
 ];
 
 export function Gallery() {

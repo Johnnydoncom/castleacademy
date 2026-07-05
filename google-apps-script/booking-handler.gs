@@ -35,7 +35,7 @@ const CC_EMAIL = "";
 const VENUE_NAME = "Castle Academy";
 
 /** Your WhatsApp or phone number (displayed in confirmation email). */
-const SUPPORT_WHATSAPP = "+234 XXX XXX XXXX";
+const SUPPORT_WHATSAPP = "+2349042222296";
 
 // ─── COLUMN ORDER ────────────────────────────────────────────────────────────
 
@@ -237,7 +237,7 @@ function customerEmailHtml(d) {
     // Header
     "<tr><td style='background:#1a2a5e;padding:28px 32px;text-align:center;'>" +
     "<h1 style='margin:0;color:#c9a84c;font-size:26px;font-weight:700;'>" + VENUE_NAME + "</h1>" +
-    "<p style='margin:6px 0 0;color:#fff;font-size:13px;opacity:.8;'>Lekki Phase 1, Lagos · Nigeria</p>" +
+    "<p style='margin:6px 0 0;color:#fff;font-size:13px;opacity:.8;'>Adeniyi Jones, Ikeja, Lagos · Nigeria</p>" +
     "</td></tr>" +
 
     // Body
@@ -262,7 +262,7 @@ function customerEmailHtml(d) {
 
     // Footer
     "<tr><td style='background:#1a2a5e;padding:20px 32px;text-align:center;'>" +
-    "<p style='margin:0;font-size:11px;color:#fff;opacity:.6;'>© " + year + " " + VENUE_NAME + " · Lekki Phase 1, Lagos, Nigeria</p>" +
+    "<p style='margin:0;font-size:11px;color:#fff;opacity:.6;'>© " + year + " " + VENUE_NAME + " · Adeniyi Jones, Ikeja, Lagos, Nigeria</p>" +
     "</td></tr>" +
 
     "</table></td></tr></table></body></html>";

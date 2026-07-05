@@ -20,7 +20,7 @@ export function Hero() {
           </h1>
           <p className="mt-6 max-w-xl text-base leading-relaxed text-white/80 sm:text-lg">
             Comfort, technology and convenience in the heart of{" "}
-            <span className="font-medium text-white">Lekki, Lagos</span>. World-class
+            <span className="font-medium text-white">Ikeja, Lagos</span>. World-class
             right here in Nigeria — no wahala, no distractions, just the room your
             training deserves.
           </p>
@@ -59,7 +59,7 @@ export function Hero() {
           <div className="relative overflow-hidden rounded-2xl border border-white/10 shadow-2xl">
             <Image
               src="/images/hero-training-room.jpg"
-              alt="Interior of Castle Academy training room in Lekki, Lagos"
+              alt="Interior of Castle Academy training room in Ikeja, Lagos"
               className="h-[420px] w-full object-cover md:h-[540px]"
               width={1536}
               height={1152}

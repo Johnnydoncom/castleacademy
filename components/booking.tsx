@@ -105,7 +105,8 @@ export function Booking() {
       try {
         const res = await fetch(SCRIPT_URL, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          // "text/plain" avoids CORS preflight — Google Apps Script reads e.postData.contents as JSON
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
           body: JSON.stringify(payload),
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);

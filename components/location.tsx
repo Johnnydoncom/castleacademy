@@ -15,7 +15,7 @@ export function Location() {
             <div className="flex items-start gap-3">
               <MapPin className="mt-0.5 h-4 w-4 text-gold flex-shrink-0" aria-hidden="true" />
               <span>
-                29b Olorunnimber Street,
+                29b Olorunnimbe Street,
                 <br />
                 Wemabod Estate, Adeniyi Jones,
                 <br />
@@ -39,7 +39,7 @@ export function Location() {
         <div className="overflow-hidden rounded-3xl border border-border shadow-xl shadow-royal/5">
           <iframe
             title="Castle Academy location — Adeniyi Jones, Ikeja Lagos"
-            src="https://www.google.com/maps?q=29b+Olorunnimber+Street,+Wemabod+Estate,+Adeniyi+Jones,+Ikeja,+Lagos,+Nigeria&output=embed"
+            src="https://www.google.com/maps?q=29b+Olorunnimbe+Street,+Wemabod+Estate,+Adeniyi+Jones,+Ikeja,+Lagos,+Nigeria&output=embed"
             className="h-80 w-full md:h-full"
             loading="lazy"
             referrerPolicy="no-referrer-when-downgrade"

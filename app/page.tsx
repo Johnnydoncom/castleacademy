@@ -27,7 +27,7 @@ const jsonLd = {
   ],
   address: {
     "@type": "PostalAddress",
-    streetAddress: "29b Olorunnimber Street, Wemabod Estate",
+    streetAddress: "29b Olorunnimbe Street, Wemabod Estate",
     addressLocality: "Adeniyi Jones, Ikeja",
     addressRegion: "Lagos State",
     addressCountry: "NG",

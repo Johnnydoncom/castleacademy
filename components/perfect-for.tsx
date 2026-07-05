@@ -2,14 +2,14 @@ import Image from "next/image";
 import { cn } from "@/lib/utils";
 
 const USE_CASES = [
-  { img: "/images/use-corporate.jpg", label: "Corporate Trainings", body: "Onboarding, compliance and leadership programs — delivered with polish." },
+  { img: "/images/training-room-center-column.jpeg", label: "Corporate Trainings", body: "Onboarding, compliance and leadership programs — delivered with polish." },
   { img: "/images/use-workshop.jpg", label: "Workshops", body: "Hands-on sessions with room to build, sketch and think out loud." },
   { img: "/images/use-seminar.jpg", label: "Seminars", body: "Speaker-led events with premium AV and attentive hosting." },
-  { img: "/images/use-meeting.jpg", label: "Team Meetings", body: "Focused, distraction-free space for high-stakes conversations." },
+  { img: "/images/training-room-window-blinds.jpeg", label: "Team Meetings", body: "Focused, distraction-free space for high-stakes conversations." },
   { img: "/images/use-course.jpg", label: "Professional Courses", body: "Multi-day cohorts and certifications in a room built to teach." },
   { img: "/images/use-presentation.jpg", label: "Business Presentations", body: "Pitch, launch and demo on a large 4K screen with cinema-grade sound." },
   { img: "/images/use-coaching.jpg", label: "Coaching Sessions", body: "Small, private setups for one-on-one and executive coaching." },
-  { img: "/images/use-strategy.jpg", label: "Strategy Sessions", body: "Whiteboards, walls and quiet — where big decisions get made." },
+  { img: "/images/training-room-ceiling-lighting.jpeg", label: "Strategy Sessions", body: "Whiteboards, walls and quiet — where big decisions get made." },
 ];
 
 export function PerfectFor() {

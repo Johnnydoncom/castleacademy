@@ -58,7 +58,7 @@ export function Hero() {
         <div className="relative">
           <div className="relative overflow-hidden rounded-2xl border border-white/10 shadow-2xl">
             <Image
-              src="/images/hero-training-room.jpg"
+              src="/images/training-room-seating-arrangement.jpeg"
               alt="Interior of Castle Academy training room in Ikeja, Lagos"
               className="h-[420px] w-full object-cover md:h-[540px]"
               width={1536}

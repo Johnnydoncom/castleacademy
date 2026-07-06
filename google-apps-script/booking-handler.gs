@@ -20,13 +20,13 @@
 // ─── CONFIGURATION ───────────────────────────────────────────────────────────
 
 /** Replace with your Google Spreadsheet ID (the long hash in the Sheet URL). */
-const SPREADSHEET_ID = "YOUR_SPREADSHEET_ID_HERE";
+const SPREADSHEET_ID = "1MRx7ukFZ7Y2Ee_mY2Pfdw6E3x9CtRJwVvt6exx9Zp0g";
 
 /** Sheet tab name — will be created automatically if it does not exist. */
 const SHEET_NAME = "Bookings";
 
 /** Notification emails — all addresses receive the admin alert. */
-const NOTIFICATION_EMAIL = "bookings@castleacademy.ng"; // change this
+const NOTIFICATION_EMAIL = "thecastleacademyspace@gmail.com"; // change this
 
 /** Optional: also CC another address (e.g. operations team). Leave empty "" to skip. */
 const CC_EMAIL = "";
@@ -35,7 +35,7 @@ const CC_EMAIL = "";
 const VENUE_NAME = "Castle Academy";
 
 /** Your WhatsApp or phone number (displayed in confirmation email). */
-const SUPPORT_WHATSAPP = "+2349042222296";
+const SUPPORT_WHATSAPP = "2349042222296";
 
 // ─── COLUMN ORDER ────────────────────────────────────────────────────────────
 
@@ -113,7 +113,7 @@ function appendRow(data) {
     // Style the header row
     const header = sheet.getRange(1, 1, 1, COLUMNS.length);
     header.setFontWeight("bold");
-    header.setBackground("#1a2a5e"); // royal blue
+    header.setBackground("#0d0d0d"); // royal noir
     header.setFontColor("#ffffff");
     header.setHorizontalAlignment("center");
     sheet.setFrozenRows(1);
@@ -161,19 +161,19 @@ function adminEmailHtml(d) {
     ? d.startDate
     : d.startDate + " → " + d.endDate;
 
-  return "<!DOCTYPE html><html lang='en'><head><meta charset='UTF-8'></head><body style='margin:0;padding:0;background:#f5f5f0;font-family:Helvetica,Arial,sans-serif;'>" +
-    "<table width='100%' cellpadding='0' cellspacing='0' style='background:#f5f5f0;padding:32px 0;'><tr><td align='center'>" +
-    "<table width='600' cellpadding='0' cellspacing='0' style='background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,.1);'>" +
+  return "<!DOCTYPE html><html lang='en'><head><meta charset='UTF-8'></head><body style='margin:0;padding:0;background:#f5f3ee;font-family:Helvetica,Arial,sans-serif;'>" +
+    "<table width='100%' cellpadding='0' cellspacing='0' style='background:#f5f3ee;padding:32px 0;'><tr><td align='center'>" +
+    "<table width='600' cellpadding='0' cellspacing='0' style='background:#fbf9f3;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,.1);'>" +
 
     // Header
-    "<tr><td style='background:#1a2a5e;padding:28px 32px;'>" +
-    "<h1 style='margin:0;color:#c9a84c;font-size:22px;font-weight:700;'>" + VENUE_NAME + "</h1>" +
-    "<p style='margin:4px 0 0;color:#fff;font-size:13px;opacity:.75;'>New Booking Request</p>" +
+    "<tr><td style='background:#0d0d0d;padding:28px 32px;text-align:center;'>" +
+    "<img src='https://castleacademy.ng/logo.png' alt='" + VENUE_NAME + "' height='48' style='display:block;margin:0 auto 12px;' />" +
+    "<p style='margin:4px 0 0;color:#c9a84c;font-size:13px;opacity:.9;'>New Booking Request</p>" +
     "</td></tr>" +
 
     // Alert banner
     "<tr><td style='background:#c9a84c;padding:12px 32px;'>" +
-    "<p style='margin:0;color:#1a2a5e;font-size:14px;font-weight:600;'>📅 " + dateLabel + " &nbsp;|&nbsp; ⏰ " + d.startTime + " – " + d.endTime + " &nbsp;|&nbsp; 👥 " + d.participants + " participants</p>" +
+    "<p style='margin:0;color:#0d0d0d;font-size:14px;font-weight:600;'>&#128197; " + dateLabel + " &nbsp;|&nbsp; &#9200; " + d.startTime + " – " + d.endTime + " &nbsp;|&nbsp; &#128101; " + d.participants + " participants</p>" +
     "</td></tr>" +
 
     // Details table
@@ -195,11 +195,11 @@ function adminEmailHtml(d) {
     // CTA
     "<tr><td style='padding:0 32px 28px;'>" +
     "<p style='font-size:13px;color:#555;margin:0 0 12px;'>Reply to this email or open the spreadsheet to manage the booking.</p>" +
-    "<a href='https://docs.google.com/spreadsheets/d/" + SPREADSHEET_ID + "' style='display:inline-block;background:#1a2a5e;color:#fff;padding:10px 24px;border-radius:50px;font-size:13px;font-weight:600;text-decoration:none;'>Open Spreadsheet →</a>" +
+    "<a href='https://docs.google.com/spreadsheets/d/" + SPREADSHEET_ID + "' style='display:inline-block;background:#0d0d0d;color:#c9a84c;padding:10px 24px;border-radius:50px;font-size:13px;font-weight:600;text-decoration:none;'>Open Spreadsheet →</a>" +
     "</td></tr>" +
 
     // Footer
-    "<tr><td style='background:#f5f5f0;padding:16px 32px;border-top:1px solid #e0e0e0;'>" +
+    "<tr><td style='background:#f5f3ee;padding:16px 32px;border-top:1px solid #e0e0e0;'>" +
     "<p style='margin:0;font-size:11px;color:#999;text-align:center;'>Automated notification from the " + VENUE_NAME + " booking form.</p>" +
     "</td></tr>" +
 
@@ -230,24 +230,24 @@ function customerEmailHtml(d) {
   const waNumber = SUPPORT_WHATSAPP.replace(/\D/g, "");
   const year = new Date().getFullYear();
 
-  return "<!DOCTYPE html><html lang='en'><head><meta charset='UTF-8'></head><body style='margin:0;padding:0;background:#f5f5f0;font-family:Helvetica,Arial,sans-serif;'>" +
-    "<table width='100%' cellpadding='0' cellspacing='0' style='background:#f5f5f0;padding:32px 0;'><tr><td align='center'>" +
-    "<table width='600' cellpadding='0' cellspacing='0' style='background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,.1);'>" +
+  return "<!DOCTYPE html><html lang='en'><head><meta charset='UTF-8'></head><body style='margin:0;padding:0;background:#f5f3ee;font-family:Helvetica,Arial,sans-serif;'>" +
+    "<table width='100%' cellpadding='0' cellspacing='0' style='background:#f5f3ee;padding:32px 0;'><tr><td align='center'>" +
+    "<table width='600' cellpadding='0' cellspacing='0' style='background:#fbf9f3;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,.1);'>" +
 
     // Header
-    "<tr><td style='background:#1a2a5e;padding:28px 32px;text-align:center;'>" +
-    "<h1 style='margin:0;color:#c9a84c;font-size:26px;font-weight:700;'>" + VENUE_NAME + "</h1>" +
-    "<p style='margin:6px 0 0;color:#fff;font-size:13px;opacity:.8;'>Adeniyi Jones, Ikeja, Lagos · Nigeria</p>" +
+    "<tr><td style='background:#0d0d0d;padding:28px 32px;text-align:center;'>" +
+    "<img src='https://castleacademy.ng/logo.png' alt='" + VENUE_NAME + "' height='48' style='display:block;margin:0 auto 12px;' />" +
+    "<p style='margin:6px 0 0;color:#c9a84c;font-size:13px;opacity:.9;'>29b Olorunnimbe Street, Wemabod Estate, Adeniyi Jones, Ikeja, Lagos</p>" +
     "</td></tr>" +
 
     // Body
     "<tr><td style='padding:32px;'>" +
-    "<h2 style='margin:0 0 8px;color:#1a2a5e;font-size:20px;'>Hi " + firstName + ", we got your request! 🎉</h2>" +
+    "<h2 style='margin:0 0 8px;color:#0d0d0d;font-size:20px;'>Hi " + firstName + ", we got your request! &#127881;</h2>" +
     "<p style='margin:0 0 20px;color:#444;font-size:14px;line-height:1.7;'>Thank you for choosing " + VENUE_NAME + ". We've received your booking request and our team will review it and get back to you within a few hours during business hours (Monday–Saturday, 9 am – 6 pm WAT).</p>" +
 
     // Summary box
-    "<table width='100%' cellpadding='0' cellspacing='0' style='background:#f5f5f0;border-radius:8px;margin-bottom:24px;'><tr><td style='padding:20px;'>" +
-    "<p style='margin:0 0 12px;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#1a2a5e;'>Your booking summary</p>" +
+    "<table width='100%' cellpadding='0' cellspacing='0' style='background:#f5f3ee;border-radius:8px;margin-bottom:24px;'><tr><td style='padding:20px;'>" +
+    "<p style='margin:0 0 12px;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#0d0d0d;'>Your booking summary</p>" +
     "<table width='100%' cellpadding='0' cellspacing='0'>" +
     row("Date(s)", dateLabel) +
     row("Time", d.startTime + " – " + d.endTime) +
@@ -256,13 +256,13 @@ function customerEmailHtml(d) {
     "</table></td></tr></table>" +
 
     "<p style='margin:0 0 20px;color:#444;font-size:14px;line-height:1.7;'>Once we confirm availability, we'll send you payment instructions. You can also reach us directly on WhatsApp:</p>" +
-    "<a href='https://wa.me/" + waNumber + "' style='display:inline-block;background:#25d366;color:#fff;padding:10px 24px;border-radius:50px;font-size:13px;font-weight:600;text-decoration:none;margin-bottom:24px;'>💬 Chat on WhatsApp</a>" +
-    "<p style='margin:20px 0 0;color:#888;font-size:12px;line-height:1.6;'>If you didn't submit this booking request, please ignore this email.<br>Reply to <a href='mailto:" + NOTIFICATION_EMAIL + "' style='color:#1a2a5e;'>" + NOTIFICATION_EMAIL + "</a> if you have any concerns.</p>" +
+    "<a href='https://wa.me/" + waNumber + "' style='display:inline-block;background:#25d366;color:#fff;padding:10px 24px;border-radius:50px;font-size:13px;font-weight:600;text-decoration:none;margin-bottom:24px;'>&#128172; Chat on WhatsApp</a>" +
+    "<p style='margin:20px 0 0;color:#888;font-size:12px;line-height:1.6;'>If you didn't submit this booking request, please ignore this email.<br>Reply to <a href='mailto:" + NOTIFICATION_EMAIL + "' style='color:#c9a84c;'>" + NOTIFICATION_EMAIL + "</a> if you have any concerns.</p>" +
     "</td></tr>" +
 
     // Footer
-    "<tr><td style='background:#1a2a5e;padding:20px 32px;text-align:center;'>" +
-    "<p style='margin:0;font-size:11px;color:#fff;opacity:.6;'>© " + year + " " + VENUE_NAME + " · Adeniyi Jones, Ikeja, Lagos, Nigeria</p>" +
+    "<tr><td style='background:#0d0d0d;padding:20px 32px;text-align:center;'>" +
+    "<p style='margin:0;font-size:11px;color:#c9a84c;opacity:.9;'>© " + year + " " + VENUE_NAME + " · 29b Olorunnimbe Street, Wemabod Estate, Ikeja, Lagos</p>" +
     "</td></tr>" +
 
     "</table></td></tr></table></body></html>";

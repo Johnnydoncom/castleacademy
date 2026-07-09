@@ -98,8 +98,6 @@ export function Gallery() {
               </CarouselItem>
             ))}
           </CarouselContent>
-          <CarouselPrevious className="hidden" />
-          <CarouselNext className="hidden" />
         </Carousel>
 
         <div className="mt-8 flex justify-center gap-2" role="tablist" aria-label="Gallery slides">

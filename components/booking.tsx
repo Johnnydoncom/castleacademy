@@ -92,31 +92,25 @@ export function Booking() {
   };
 
   const onSubmit = async (values: BookingValues) => {
-    const payload = {
+    const payload: Record<string, any> = {
       ...values,
       startDate: format(values.startDate, "yyyy-MM-dd"),
       endDate: format(values.endDate, "yyyy-MM-dd"),
     };
 
-    if (!SCRIPT_URL) {
-      console.warn("[Booking] NEXT_PUBLIC_GOOGLE_SCRIPT_URL is not set. Logging payload:", payload);
-      await new Promise((r) => setTimeout(r, 700));
-    } else {
-      try {
-        const res = await fetch(SCRIPT_URL, {
-          method: "POST",
-          // "text/plain" avoids CORS preflight — Google Apps Script reads e.postData.contents as JSON
-          headers: { "Content-Type": "text/plain;charset=utf-8" },
-          body: JSON.stringify(payload),
-        });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      } catch (err) {
-        console.error("[Booking] Submission failed:", err);
-        toast.error("Submission failed", {
-          description: "Something went wrong. Please try again or contact us directly.",
-        });
-        return;
-      }
+    try {
+      const res = await fetch("/api/book", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    } catch (err) {
+      console.error("[Booking] Submission failed:", err);
+      toast.error("Submission failed", {
+        description: "Something went wrong. Please try again or contact us directly.",
+      });
+      return;
     }
 
     setSubmitSuccess(true);

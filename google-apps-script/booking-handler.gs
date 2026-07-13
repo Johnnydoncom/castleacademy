@@ -102,21 +102,35 @@ function appendRow(data) {
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   let sheet = ss.getSheetByName(SHEET_NAME);
 
-  // Auto-create the sheet + header row on first use
+  // Auto-create the sheet if it doesn't exist
   if (!sheet) {
     sheet = ss.insertSheet(SHEET_NAME);
-    sheet.appendRow(COLUMNS);
+  }
 
-    // Style the header row
+  // Ensure header row perfectly aligns with COLUMNS
+  const lastCol = Math.max(sheet.getLastColumn(), 1);
+  const currentHeaders = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+  
+  // If the headers on the sheet don't match our script's COLUMNS exactly, overwrite them
+  if (currentHeaders.join(",") !== COLUMNS.join(",")) {
+    // Clear the entire first row in case the old header was longer
+    sheet.getRange(1, 1, 1, sheet.getMaxColumns()).clearContent();
+    sheet.getRange(1, 1, 1, COLUMNS.length).setValues([COLUMNS]);
+
+    // Apply strict styling
     const header = sheet.getRange(1, 1, 1, COLUMNS.length);
     header.setFontWeight("bold");
     header.setBackground("#0d0d0d"); // royal noir
     header.setFontColor("#ffffff");
     header.setHorizontalAlignment("center");
     sheet.setFrozenRows(1);
+    
+    // Set column widths for better UX
     sheet.setColumnWidth(1, 160);  // Submitted At
     sheet.setColumnWidth(2, 180);  // Full Name
+    sheet.setColumnWidth(5, 200);  // Email
     sheet.setColumnWidth(12, 360); // Optional Extras
+    sheet.setColumnWidth(15, 300); // Breakdown
   }
 
   const now = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm:ss");

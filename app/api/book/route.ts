@@ -20,6 +20,11 @@ const invoiceSchema: Schema = {
 };
 
 function safe(v: any) { return v == null ? "" : String(v).trim(); }
+function formatExtras(v: any): string {
+  if (!v) return "None";
+  if (Array.isArray(v)) return v.length ? v.join(", ") : "None";
+  return String(v).trim() || "None";
+}
 function formatEventType(v: string) {
   const map: Record<string, string> = {
     training: "Corporate Training", workshop: "Workshop", seminar: "Seminar",
@@ -106,7 +111,7 @@ export async function POST(req: Request) {
             ${row("Start Time", data.startTime)}
             ${row("End Time", data.endTime)}
             ${row("Participants", String(data.participants))}
-            ${row("Requirements", data.requirements || "None")}
+            ${row("Optional Extras", formatExtras(data.extras))}
             ${data.invoiceTotal ? row("Estimated Price", "₦" + Number(data.invoiceTotal).toLocaleString()) : ""}
             ${data.discountApplied ? row("Discount Applied", data.discountApplied) : ""}
             ${data.invoiceBreakdown ? row("Pricing Breakdown", data.invoiceBreakdown) : ""}
@@ -149,6 +154,7 @@ export async function POST(req: Request) {
               ${data.invoiceTotal ? row("Estimated Price", "₦" + Number(data.invoiceTotal).toLocaleString()) : ""}
               ${data.discountApplied ? row("Discount Applied", data.discountApplied) : ""}
               ${data.invoiceBreakdown ? row("Pricing Breakdown", data.invoiceBreakdown) : ""}
+              ${data.extras?.length ? row("Optional Extras", formatExtras(data.extras)) : ""}
               </table></td></tr></table>
               <p style='margin:0 0 20px;color:#444;font-size:14px;line-height:1.7;'>Once we confirm availability, we'll send you payment instructions. You can also reach us directly on WhatsApp:</p>
               <a href='https://wa.me/${waNumber}' style='display:inline-block;background:#25d366;color:#fff;padding:10px 24px;border-radius:50px;font-size:13px;font-weight:600;text-decoration:none;margin-bottom:24px;'>Chat on WhatsApp</a>

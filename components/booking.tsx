@@ -10,7 +10,8 @@ import { CalendarIcon, Clock, MessageCircle, ShieldCheck } from "lucide-react";
 import type { DateRange } from "react-day-picker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
+import { TimePicker } from "@/components/ui/time-picker";
 import {
   Select,
   SelectContent,
@@ -40,7 +41,7 @@ const bookingSchema = z
       .number({ message: "Please enter a number" })
       .min(1, "At least 1 participant")
       .max(24, "Our room seats up to 24"),
-    requirements: z.string().optional(),
+    extras: z.array(z.string()).optional(),
   })
   .refine(
     (data) =>
@@ -54,6 +55,17 @@ const bookingSchema = z
 type BookingValues = z.infer<typeof bookingSchema>;
 
 const SCRIPT_URL = process.env.NEXT_PUBLIC_GOOGLE_SCRIPT_URL;
+
+const OPTIONAL_EXTRAS = [
+  "Tea/Coffee Service",
+  "Bottled Water",
+  "Lunch Coordination",
+  "Flipchart And Markers",
+  "Printing And Photocopying",
+  "Event Photography",
+  "On-Site Technical Support",
+  "Registration Desk Assistance",
+] as const;
 
 export function Booking() {
   const [submitSuccess, setSubmitSuccess] = useState(false);
@@ -259,21 +271,59 @@ export function Booking() {
 
                 {/* Start time / End time */}
                 <Field label="Start time" error={errors.startTime?.message}>
-                  <Input id="startTime" type="time" {...register("startTime")} aria-required="true" />
+                  <TimePicker
+                    id="startTime"
+                    value={watch("startTime")}
+                    onChange={(v) => setValue("startTime", v, { shouldValidate: true })}
+                    placeholder="Pick start time"
+                    aria-required={true}
+                  />
                 </Field>
                 <Field label="End time" error={errors.endTime?.message}>
-                  <Input id="endTime" type="time" {...register("endTime")} aria-required="true" />
+                  <TimePicker
+                    id="endTime"
+                    value={watch("endTime")}
+                    onChange={(v) => setValue("endTime", v, { shouldValidate: true })}
+                    placeholder="Pick end time"
+                    aria-required={true}
+                  />
                 </Field>
 
-                {/* Additional requirements */}
+                {/* Optional extras */}
                 <div className="sm:col-span-2">
-                  <Field label="Additional requirements" hint="optional">
-                    <Textarea
-                      id="requirements"
-                      rows={4}
-                      placeholder="Anything else we should prepare — catering, extra whiteboards, projector setup, accessibility needs…"
-                      {...register("requirements")}
-                    />
+                  <Field label="Optional extras" hint="optional">
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      {OPTIONAL_EXTRAS.map((extra) => {
+                        const id = `extra-${extra.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
+                        const checked = (watch("extras") ?? []).includes(extra);
+                        return (
+                          <label
+                            key={extra}
+                            htmlFor={id}
+                            className="flex cursor-pointer items-center gap-3 rounded-lg border border-border bg-muted/30 px-4 py-3 transition-colors hover:bg-muted/60 has-[:checked]:border-gold has-[:checked]:bg-gold/5"
+                          >
+                            <Checkbox
+                              id={id}
+                              checked={checked}
+                              onCheckedChange={(isChecked) => {
+                                const current = watch("extras") ?? [];
+                                setValue(
+                                  "extras",
+                                  isChecked
+                                    ? [...current, extra]
+                                    : current.filter((e) => e !== extra),
+                                  { shouldValidate: true }
+                                );
+                              }}
+                              className="border-border data-[state=checked]:border-gold data-[state=checked]:bg-gold data-[state=checked]:text-royal-deep"
+                            />
+                            <span className="text-sm font-medium leading-tight text-foreground">
+                              {extra}
+                            </span>
+                          </label>
+                        );
+                      })}
+                    </div>
                   </Field>
                 </div>
               </div>

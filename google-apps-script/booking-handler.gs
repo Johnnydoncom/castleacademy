@@ -51,7 +51,7 @@ const COLUMNS = [
   "Start Time",
   "End Time",
   "Participants",
-  "Requirements",
+  "Optional Extras",
   "Status",
   "Invoice Total",
   "Invoice Breakdown",
@@ -116,7 +116,7 @@ function appendRow(data) {
     sheet.setFrozenRows(1);
     sheet.setColumnWidth(1, 160);  // Submitted At
     sheet.setColumnWidth(2, 180);  // Full Name
-    sheet.setColumnWidth(12, 300); // Requirements
+    sheet.setColumnWidth(12, 360); // Optional Extras
   }
 
   const now = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm:ss");
@@ -133,7 +133,7 @@ function appendRow(data) {
     safe(data.startTime),
     safe(data.endTime),
     Number(data.participants) || 0,
-    safe(data.requirements),
+    formatExtras(data.extras),
     "Pending",
     data.invoiceTotal ? "₦" + Number(data.invoiceTotal).toLocaleString() : "—",
     safe(data.invoiceBreakdown),
@@ -157,6 +157,12 @@ function validatePayload(d) {
 
 function safe(v) {
   return v == null ? "" : String(v).trim();
+}
+
+function formatExtras(v) {
+  if (!v) return "None";
+  if (Array.isArray(v)) return v.length ? v.join(", ") : "None";
+  return String(v).trim() || "None";
 }
 
 function formatEventType(v) {

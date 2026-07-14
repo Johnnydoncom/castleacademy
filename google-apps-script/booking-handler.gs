@@ -53,9 +53,12 @@ const COLUMNS = [
   "Participants",
   "Optional Extras",
   "Status",
-  "Invoice Total",
-  "Invoice Breakdown",
+  "Subtotal (ex. VAT)",
+  "VAT Rate",
+  "VAT Amount",
+  "Total (inc. VAT)",
   "Discount Applied",
+  "Invoice Breakdown",
 ];
 
 // ─── MAIN HANDLER ────────────────────────────────────────────────────────────
@@ -130,7 +133,10 @@ function appendRow(data) {
     sheet.setColumnWidth(2, 180);  // Full Name
     sheet.setColumnWidth(5, 200);  // Email
     sheet.setColumnWidth(12, 360); // Optional Extras
-    sheet.setColumnWidth(15, 300); // Breakdown
+    sheet.setColumnWidth(15, 120); // VAT Rate
+    sheet.setColumnWidth(16, 140); // VAT Amount
+    sheet.setColumnWidth(17, 160); // Total (inc. VAT)
+    sheet.setColumnWidth(19, 300); // Invoice Breakdown
   }
 
   const now = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm:ss");
@@ -149,9 +155,12 @@ function appendRow(data) {
     Number(data.participants) || 0,
     formatExtras(data.extras),
     "Pending",
+    data.invoiceSubtotal ? "₦" + Number(data.invoiceSubtotal).toLocaleString() : "—",
+    data.invoiceVatRate ? data.invoiceVatRate + "%" : "7.5%",
+    data.invoiceVatAmount ? "₦" + Number(data.invoiceVatAmount).toLocaleString() : "—",
     data.invoiceTotal ? "₦" + Number(data.invoiceTotal).toLocaleString() : "—",
-    safe(data.invoiceBreakdown),
     safe(data.discountApplied),
+    safe(data.invoiceBreakdown),
   ]);
 }
 

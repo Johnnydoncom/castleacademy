@@ -8,6 +8,7 @@ const VENUE_NAME = process.env.VENUE_NAME || "Castle Academy";
 const NOTIFICATION_EMAIL = process.env.NOTIFICATION_EMAIL || "thecastleacademyspace@gmail.com";
 const SUPPORT_WHATSAPP = process.env.SUPPORT_WHATSAPP || "2349042222296";
 const APP_URL = process.env.APP_URL || "https://thecastleacademy.com";
+const VAT_RATE = parseFloat(process.env.VAT_RATE || "7.5");
 
 const invoiceSchema: Schema = {
   type: Type.OBJECT,
@@ -62,7 +63,14 @@ export async function POST(req: Request) {
         });
 
         const invoice = JSON.parse(aiRes.text || "{}");
-        data.invoiceTotal = invoice.totalPrice;
+        const subtotal = Number(invoice.totalPrice) || 0;
+        const vatAmount = Math.round(subtotal * VAT_RATE / 100);
+        const vatTotal = subtotal + vatAmount;
+
+        data.invoiceSubtotal = subtotal;
+        data.invoiceVatRate = VAT_RATE;
+        data.invoiceVatAmount = vatAmount;
+        data.invoiceTotal = vatTotal;        // grand total inc. VAT
         data.invoiceBreakdown = invoice.breakdown;
         data.discountApplied = invoice.discountApplied;
 
@@ -112,8 +120,10 @@ export async function POST(req: Request) {
             ${row("End Time", data.endTime)}
             ${row("Participants", String(data.participants))}
             ${row("Optional Extras", formatExtras(data.extras))}
-            ${data.invoiceTotal ? row("Estimated Price", "₦" + Number(data.invoiceTotal).toLocaleString()) : ""}
+            ${data.invoiceSubtotal ? row("Subtotal (ex. VAT)", "₦" + Number(data.invoiceSubtotal).toLocaleString()) : ""}
             ${data.discountApplied ? row("Discount Applied", data.discountApplied) : ""}
+            ${data.invoiceVatAmount ? row(`VAT (${data.invoiceVatRate}%)`, "₦" + Number(data.invoiceVatAmount).toLocaleString()) : ""}
+            ${data.invoiceTotal ? row("Total Payable (inc. VAT)", "<strong>₦" + Number(data.invoiceTotal).toLocaleString() + "</strong>") : ""}
             ${data.invoiceBreakdown ? row("Pricing Breakdown", data.invoiceBreakdown) : ""}
             </table></td></tr>
             <tr><td style='background:#f5f3ee;padding:16px 32px;border-top:1px solid #e0e0e0;'>
@@ -151,8 +161,10 @@ export async function POST(req: Request) {
               ${row("Time", data.startTime + " – " + data.endTime)}
               ${row("Event type", formatEventType(data.eventType))}
               ${row("Participants", String(data.participants))}
-              ${data.invoiceTotal ? row("Estimated Price", "₦" + Number(data.invoiceTotal).toLocaleString()) : ""}
+              ${data.invoiceSubtotal ? row("Subtotal (ex. VAT)", "₦" + Number(data.invoiceSubtotal).toLocaleString()) : ""}
               ${data.discountApplied ? row("Discount Applied", data.discountApplied) : ""}
+              ${data.invoiceVatAmount ? row(`VAT (${data.invoiceVatRate}%)`, "₦" + Number(data.invoiceVatAmount).toLocaleString()) : ""}
+              ${data.invoiceTotal ? row("Total Payable (inc. VAT)", "<strong>₦" + Number(data.invoiceTotal).toLocaleString() + "</strong>") : ""}
               ${data.invoiceBreakdown ? row("Pricing Breakdown", data.invoiceBreakdown) : ""}
               ${data.extras?.length ? row("Optional Extras", formatExtras(data.extras)) : ""}
               </table></td></tr></table>

@@ -64,3 +64,8 @@ Offer Optional Extras Such As:
 - Event Photography
 - On Site Technical Support
 - Registration Desk Assistance
+
+VAT
+All prices listed above are exclusive of VAT.
+A VAT rate of 7.5% is applied to the subtotal (after any discounts) to arrive at the final payable amount.
+Your totalPrice in the response MUST be the pre-VAT subtotal only. The system will calculate and add VAT separately.

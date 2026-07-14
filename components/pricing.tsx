@@ -30,6 +30,7 @@ export function Pricing() {
                   <span className="font-display text-5xl leading-none text-white md:text-6xl">
                     ₦100,000
                   </span>
+                  <span className="text-sm font-medium text-gold/80">+ VAT</span>
                 </div>
                 <p className="mt-2 text-sm text-white/70">
                   for up to 3 hours of dedicated venue time
@@ -41,7 +42,7 @@ export function Pricing() {
                       Extra hour
                     </div>
                     <div className="mt-1 font-display text-2xl text-gold">
-                      ₦30,000
+                      ₦30,000 <span className="text-sm font-normal text-gold/70">+ VAT</span>
                     </div>
                   </div>
                   <div className="text-right">
@@ -82,7 +83,7 @@ export function Pricing() {
                 <a href="#book">Reserve your date</a>
               </Button>
               <p className="mt-3 flex items-center justify-center gap-2 text-[11px] text-muted-foreground">
-                <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" /> Secure payment via Paystack / Flutterwave
+                <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" /> Secure payment via Paystack / Flutterwave · All prices ex. VAT (7.5% VAT applies)
               </p>
             </div>
           </div>

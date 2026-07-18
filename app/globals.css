@@ -189,3 +189,18 @@
     display: none;
   }
 }
+
+@keyframes wa-pulse {
+  0% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(1.5);
+    opacity: 0;
+  }
+}
+
+@utility animate-wa-pulse {
+  animation: wa-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}

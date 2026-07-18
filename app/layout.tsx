@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
+import { WhatsAppFAB } from "@/components/whatsapp-fab";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://castleacademy.ng"),
@@ -64,6 +65,7 @@ export default function RootLayout({
       </head>
       <body>
         {children}
+        <WhatsAppFAB />
         <Toaster position="top-center" richColors />
       </body>
     </html>

@@ -5,14 +5,16 @@ export function Field({
   hint,
   error,
   children,
+  className,
 }: {
   label: string;
   hint?: string;
   error?: string;
   children: React.ReactNode;
+  className?: string;
 }) {
   return (
-    <div>
+    <div className={className}>
       <div className="mb-1.5 flex items-baseline justify-between">
         <Label className="text-xs font-medium uppercase tracking-[0.12em] text-ink/70">
           {label}

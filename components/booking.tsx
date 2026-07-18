@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -42,6 +42,9 @@ const bookingSchema = z
       .min(1, "At least 1 participant")
       .max(24, "Our room seats up to 24"),
     extras: z.array(z.string()).optional(),
+    agreedToPolicy: z.boolean().refine(val => val === true, {
+      message: "You must acknowledge the cancellation policy to proceed."
+    }),
   })
   .refine(
     (data) =>
@@ -69,7 +72,11 @@ const OPTIONAL_EXTRAS = [
 
 export function Booking() {
   const [submitSuccess, setSubmitSuccess] = useState(false);
+  const [reference, setReference] = useState<string | null>(null);
+  const [checkoutLink, setCheckoutLink] = useState<string | null>(null);
+  const [amount, setAmount] = useState<number | null>(null);
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
+  const [busySlots, setBusySlots] = useState<{ startTime: string; endTime: string }[]>([]);
 
   const {
     register,
@@ -86,6 +93,20 @@ export function Booking() {
   const startDate = watch("startDate");
   const endDate = watch("endDate");
   const eventType = watch("eventType");
+
+  useEffect(() => {
+    if (!startDate) {
+      setBusySlots([]);
+      return;
+    }
+    const dateStr = format(startDate, "yyyy-MM-dd");
+    fetch(`/api/availability?date=${dateStr}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.busySlots) setBusySlots(data.busySlots);
+      })
+      .catch(err => console.error("Failed to fetch availability:", err));
+  }, [startDate]);
 
   const handleDateRangeSelect = (range: DateRange | undefined) => {
     setDateRange(range);
@@ -116,7 +137,18 @@ export function Booking() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      
+      if (!res.ok) {
+        if (res.status === 409) {
+          toast.error("Slot unavailable", { description: data.message });
+          return;
+        }
+        throw new Error(`HTTP ${res.status}`);
+      }
+      setReference(data.reference);
+      if (data.checkoutLink) setCheckoutLink(data.checkoutLink);
+      if (data.amount) setAmount(data.amount);
     } catch (err) {
       console.error("[Booking] Submission failed:", err);
       toast.error("Submission failed", {
@@ -127,12 +159,13 @@ export function Booking() {
 
     setSubmitSuccess(true);
     setDateRange(undefined);
+    setBusySlots([]);
     toast.success("Space reserved!", {
-      description:
-        "We'll send confirmation + payment instructions to your email and WhatsApp shortly.",
+      description: checkoutLink
+        ? "Complete payment to confirm your slot."
+        : "We'll send payment instructions to your email shortly.",
     });
-    reset({ participants: 12 });
-    setTimeout(() => setSubmitSuccess(false), 6000);
+    reset({ participants: 12, agreedToPolicy: undefined as any });
   };
 
   return (
@@ -158,7 +191,7 @@ export function Booking() {
                 <ul className="mt-8 space-y-4 text-sm">
                   {[
                     { icon: Clock, label: "Instant response during business hours" },
-                    { icon: ShieldCheck, label: "Secure Paystack / Flutterwave payments" },
+                    { icon: ShieldCheck, label: "Secure Nomba payments (card & bank transfer)" },
                     { icon: MessageCircle, label: "Auto WhatsApp booking confirmation" },
                   ].map((it) => (
                     <li key={it.label} className="flex items-start gap-3 text-white/85">
@@ -177,8 +210,50 @@ export function Booking() {
 
             <form onSubmit={handleSubmit(onSubmit)} className="p-8 md:p-12" noValidate>
               {submitSuccess && (
-                <div className="mb-6 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800" role="status">
-                  ✅ Your booking request has been received! We&apos;ll be in touch shortly.
+                <div className="mb-6 rounded-xl border border-emerald-200 bg-emerald-50 p-5 text-emerald-800" role="status">
+                  <div className="flex items-center gap-2 font-semibold text-base">
+                    ✅ Booking request received!
+                  </div>
+                  <p className="mt-2 text-sm text-emerald-700">
+                    Your booking reference is:
+                  </p>
+                  <div className="mt-3 flex flex-wrap items-center gap-3">
+                    <div className="rounded-md bg-emerald-100 px-3 py-1.5 font-mono text-lg font-bold tracking-wider">
+                      {reference}
+                    </div>
+                    <Button type="button" variant="outline" size="sm" onClick={() => {
+                      navigator.clipboard.writeText(reference || "");
+                      toast.success("Reference copied!");
+                    }} className="h-9 bg-white hover:bg-emerald-100 hover:text-emerald-900 border-emerald-300">
+                      Copy
+                    </Button>
+                  </div>
+
+                  {checkoutLink ? (
+                    <div className="mt-4 rounded-lg border border-emerald-300 bg-emerald-100 p-4">
+                      <p className="text-sm font-semibold text-emerald-900 mb-1">💳 Complete your payment to confirm the slot</p>
+                      {amount && (
+                        <p className="text-emerald-800 font-medium mb-1">
+                          Amount due: <span className="font-bold">₦{amount.toLocaleString()}</span> (inc. VAT)
+                        </p>
+                      )}
+                      <p className="text-xs text-emerald-700 mb-3">
+                        Your time slot is soft-reserved for 6 hours. Payment must be completed before then to secure your booking.
+                      </p>
+                      <a
+                        href={checkoutLink}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-2 rounded-full bg-emerald-700 px-5 py-2 text-sm font-semibold text-white hover:bg-emerald-800 transition-colors"
+                      >
+                        Pay Now {amount ? `— ₦${amount.toLocaleString()}` : ""} →
+                      </a>
+                    </div>
+                  ) : (
+                    <p className="mt-3 text-xs text-emerald-700/80">
+                      We'll send payment instructions to your email shortly. You can safely close this page.
+                    </p>
+                  )}
                 </div>
               )}
 
@@ -276,6 +351,7 @@ export function Booking() {
                     value={watch("startTime")}
                     onChange={(v) => setValue("startTime", v, { shouldValidate: true })}
                     placeholder="Pick start time"
+                    busySlots={busySlots}
                     aria-required={true}
                   />
                 </Field>
@@ -285,6 +361,7 @@ export function Booking() {
                     value={watch("endTime")}
                     onChange={(v) => setValue("endTime", v, { shouldValidate: true })}
                     placeholder="Pick end time"
+                    busySlots={busySlots}
                     aria-required={true}
                   />
                 </Field>
@@ -326,6 +403,37 @@ export function Booking() {
                     </div>
                   </Field>
                 </div>
+
+                {/* Policy Notice */}
+                <div className="sm:col-span-2 mt-4">
+                  <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-5">
+                    <div className="flex items-start gap-3">
+                      <div className="text-xl">⚠️</div>
+                      <div>
+                        <p className="text-sm font-semibold text-amber-900">
+                          Important: Cancellation Policy
+                        </p>
+                        <p className="mt-1 text-sm leading-relaxed text-amber-800/90">
+                          Once a booking is confirmed, it cannot be cancelled or refunded.
+                        </p>
+                        <label className="mt-4 flex cursor-pointer items-center gap-3">
+                          <Checkbox
+                            id="agreedToPolicy"
+                            checked={watch("agreedToPolicy") === true}
+                            onCheckedChange={(v) => setValue("agreedToPolicy", v === true, { shouldValidate: true })}
+                            className="border-amber-600/50 data-[state=checked]:bg-amber-600 data-[state=checked]:text-white"
+                          />
+                          <span className="text-sm font-medium text-amber-900">
+                            I understand and agree that this booking is non-refundable.
+                          </span>
+                        </label>
+                        {errors.agreedToPolicy && (
+                          <p className="mt-2 text-xs font-medium text-destructive">{errors.agreedToPolicy.message}</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
 
               <Button
@@ -335,7 +443,7 @@ export function Booking() {
                 className="mt-8 w-full rounded-full bg-gold text-royal-deep hover:bg-gold-soft disabled:opacity-60"
                 aria-busy={isSubmitting}
               >
-                {isSubmitting ? "Reserving…" : "Reserve My Space"}
+                {isSubmitting ? "Calculating price & preparing payment…" : "Reserve My Space"}
               </Button>
               <p className="mt-3 text-center text-[11px] text-muted-foreground">
                 By submitting, you agree to be contacted about your booking.

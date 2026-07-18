@@ -15,6 +15,7 @@ interface TimePickerProps {
   disabled?: boolean;
   className?: string;
   "aria-required"?: boolean;
+  busySlots?: { startTime: string; endTime: string }[];
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -44,6 +45,29 @@ function displayTime(val: string | undefined): string {
   return `${h}:${m} ${period}`;
 }
 
+function isTimeBusy(time24: string, busySlots?: { startTime: string; endTime: string }[]): boolean {
+  if (!busySlots || busySlots.length === 0) return false;
+  for (const slot of busySlots) {
+    if (time24 >= slot.startTime && time24 < slot.endTime) return true;
+  }
+  return false;
+}
+
+function isHourCompletelyBusy(hRaw: string, period: "AM" | "PM", busySlots?: { startTime: string; endTime: string }[]): boolean {
+  if (!busySlots || busySlots.length === 0) return false;
+  // Check if every 5-minute interval in this hour is busy
+  for (let m = 0; m < 60; m += 5) {
+    const time24 = to24(hRaw, String(m).padStart(2, "0"), period);
+    if (!isTimeBusy(time24, busySlots)) return false;
+  }
+  return true;
+}
+
+function isMinuteBusyForHour(hRaw: string, mRaw: string, period: "AM" | "PM", busySlots?: { startTime: string; endTime: string }[]): boolean {
+  const time24 = to24(hRaw, mRaw, period);
+  return isTimeBusy(time24, busySlots);
+}
+
 export function TimePicker({
   id,
   value,
@@ -51,6 +75,7 @@ export function TimePicker({
   placeholder = "Select time",
   disabled,
   className,
+  busySlots,
   "aria-required": ariaRequired,
 }: TimePickerProps) {
   const [open, setOpen] = React.useState(false);
@@ -83,6 +108,8 @@ export function TimePicker({
   const handlePeriod = (v: "AM" | "PM") => { setPeriod(v); commit(h, m, v); };
 
   const display = value ? displayTime(value) : "";
+  const current24 = to24(h, m, period);
+  const isBusy = isTimeBusy(current24, busySlots);
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -115,9 +142,10 @@ export function TimePicker({
         <div className="flex flex-col">
           {/* Header */}
           <div className="flex flex-col items-center justify-center border-b bg-muted/20 py-4">
-            <div className="text-3xl font-light tabular-nums tracking-tight text-foreground">
+            <div className={cn("text-3xl font-light tabular-nums tracking-tight", isBusy ? "text-destructive" : "text-foreground")}>
               {h}:{m} <span className="text-lg font-medium text-muted-foreground">{period}</span>
             </div>
+            {isBusy && <span className="mt-1 text-[11px] font-medium text-destructive">This time is unavailable</span>}
           </div>
           
           <div className="flex p-4 gap-6">
@@ -125,21 +153,25 @@ export function TimePicker({
             <div className="flex flex-col gap-2.5">
               <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Hour</span>
               <div className="grid grid-cols-4 gap-2">
-                {HOURS_12.map((item) => (
+                {HOURS_12.map((item) => {
+                  const fullyBusy = isHourCompletelyBusy(item, period, busySlots);
+                  return (
                   <button
                     key={item}
                     type="button"
                     onClick={() => handleH(item)}
+                    disabled={fullyBusy}
                     className={cn(
-                      "flex h-9 w-9 items-center justify-center rounded-md text-sm transition-all hover:bg-muted",
+                      "flex h-9 w-9 items-center justify-center rounded-md text-sm transition-all hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed",
                       h === item
                         ? "bg-gold text-royal-deep font-semibold shadow-sm hover:bg-gold/90"
-                        : "text-foreground font-medium"
+                        : "text-foreground font-medium",
+                      fullyBusy && "line-through text-muted-foreground"
                     )}
                   >
                     {item}
                   </button>
-                ))}
+                )})}
               </div>
             </div>
 
@@ -150,21 +182,25 @@ export function TimePicker({
             <div className="flex flex-col gap-2.5">
               <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Minute</span>
               <div className="grid grid-cols-4 gap-2">
-                {MINUTES.map((item) => (
+                {MINUTES.map((item) => {
+                  const minuteBusy = isMinuteBusyForHour(h, item, period, busySlots);
+                  return (
                   <button
                     key={item}
                     type="button"
                     onClick={() => handleM(item)}
+                    disabled={minuteBusy}
                     className={cn(
-                      "flex h-9 w-9 items-center justify-center rounded-md text-sm transition-all hover:bg-muted",
+                      "flex h-9 w-9 items-center justify-center rounded-md text-sm transition-all hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed",
                       m === item
                         ? "bg-gold text-royal-deep font-semibold shadow-sm hover:bg-gold/90"
-                        : "text-foreground font-medium"
+                        : "text-foreground font-medium",
+                      minuteBusy && "line-through text-muted-foreground"
                     )}
                   >
                     {item}
                   </button>
-                ))}
+                )})}
               </div>
             </div>
           </div>
@@ -191,8 +227,9 @@ export function TimePicker({
             
             <button
               type="button"
+              disabled={isBusy}
               onClick={() => setOpen(false)}
-              className="rounded-md bg-gold px-4 py-1.5 text-sm font-semibold text-royal-deep shadow-sm transition-all hover:bg-gold/90"
+              className="rounded-md bg-gold px-4 py-1.5 text-sm font-semibold text-royal-deep shadow-sm transition-all hover:bg-gold/90 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Done
             </button>

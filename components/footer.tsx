@@ -1,4 +1,6 @@
 import { Logo } from "@/components/logo";
+import { sql } from "@/lib/db";
+import { Facebook, Instagram, Twitter, Youtube, Linkedin, Link as LinkIcon } from "lucide-react";
 
 const NAV_LINKS = [
   { href: "#why", label: "Why Castle" },
@@ -8,7 +10,28 @@ const NAV_LINKS = [
   { href: "#book", label: "Book" },
 ];
 
-export function Footer() {
+export async function Footer() {
+  let socialLinks: Record<string, string> = {};
+  try {
+    const rows = await sql`SELECT platform, url FROM social_links WHERE url IS NOT NULL AND url != ''`;
+    for (const row of rows) {
+      socialLinks[row.platform as string] = row.url as string;
+    }
+  } catch (err) {
+    console.error("Failed to fetch social links for footer:", err);
+  }
+
+  const getIcon = (platform: string) => {
+    switch (platform) {
+      case "facebook": return <Facebook className="w-5 h-5" />;
+      case "instagram": return <Instagram className="w-5 h-5" />;
+      case "twitter": return <Twitter className="w-5 h-5" />;
+      case "youtube": return <Youtube className="w-5 h-5" />;
+      case "linkedin": return <Linkedin className="w-5 h-5" />;
+      default: return <LinkIcon className="w-5 h-5" />;
+    }
+  };
+
   return (
     <footer className="bg-royal-deep pt-14 pb-8 text-white">
       <div className="mx-auto grid max-w-7xl gap-10 px-5 md:grid-cols-[1.4fr_1fr_1fr] md:px-8">
@@ -50,6 +73,23 @@ export function Footer() {
             </li>
             <li>Adeniyi Jones, Ikeja, Lagos</li>
           </ul>
+
+          {Object.keys(socialLinks).length > 0 && (
+            <div className="mt-8 flex items-center gap-4">
+              {Object.entries(socialLinks).map(([platform, url]) => (
+                <a
+                  key={platform}
+                  href={url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-white/60 hover:text-gold transition-colors"
+                  aria-label={platform}
+                >
+                  {getIcon(platform)}
+                </a>
+              ))}
+            </div>
+          )}
         </div>
       </div>
       <div className="mx-auto mt-12 flex max-w-7xl flex-col items-center justify-between gap-3 border-t border-white/10 px-5 pt-6 text-xs text-white/50 md:flex-row md:px-8">

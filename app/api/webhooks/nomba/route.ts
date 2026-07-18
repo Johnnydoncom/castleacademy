@@ -364,7 +364,7 @@ ${amountStr ? `<tr><td style='padding:5px 0;font-size:13px;color:#888;'>Amount P
 <tr><td style='padding:5px 0;font-size:13px;color:#888;'>Date(s)</td><td style='padding:5px 0;font-size:13px;color:#222;font-weight:500;'>${dateLabel}</td></tr>
 <tr><td style='padding:5px 0;font-size:13px;color:#888;'>Time</td><td style='padding:5px 0;font-size:13px;color:#222;font-weight:500;'>${booking.start_time?.slice(0, 5)} – ${booking.end_time?.slice(0, 5)}</td></tr>
 ${amountStr ? `<tr><td style='padding:5px 0;font-size:13px;color:#888;'>Amount Paid</td><td style='padding:5px 0;font-size:13px;color:#16a34a;font-weight:700;'>${amountStr}</td></tr>` : ""}
-<tr><td style='padding:5px 0;font-size:13px;color:#888;'>Payment Method</td><td style='padding:5px 0;font-size:13px;color:#222;font-weight:500;'>${verification.paymentMethod || paymentMethod}</td></tr>
+<tr><td style='padding:5px 0;font-size:13px;color:#888;'>Payment Method</td><td style='padding:5px 0;font-size:13px;color:#222;font-weight:500;'>${verifiedPaymentMethod}</td></tr>
 ${transactionId ? `<tr><td style='padding:5px 0;font-size:13px;color:#888;'>Nomba Tx ID</td><td style='padding:5px 0;font-size:11px;color:#666;font-family:monospace;word-break:break-all;'>${transactionId}</td></tr>` : ""}
 </table>
 </td></tr>

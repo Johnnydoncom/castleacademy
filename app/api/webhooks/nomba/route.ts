@@ -29,13 +29,14 @@ function createMailTransporter() {
 
 /**
  * POST /api/webhooks/nomba
- * Receives payment_success events from Nomba, verifies the signature,
- * verifies the transaction server-side, then auto-confirms the booking.
+ * Receives payment_success, payment_failed, and payment_reversed events from Nomba.
+ * Verifies the HMAC signature, then verifies the transaction server-side before
+ * updating the booking status.
  *
  * ─── Setup Instructions ────────────────────────────────────────────────────
  * Register this URL in Nomba Dashboard → Developer → Webhook Setup:
  *   Production: https://thecastleacademy.com/api/webhooks/nomba
- * Subscribe to the `payment_success` event.
+ * Subscribe to: payment_success, payment_failed, payment_reversed events.
  * Copy the signature key into NOMBA_WEBHOOK_SECRET in your environment.
  * ───────────────────────────────────────────────────────────────────────────
  */
@@ -58,11 +59,16 @@ export async function POST(req: Request) {
       console.warn("[webhooks/nomba] NOMBA_WEBHOOK_SECRET not set — skipping signature verification");
     }
 
-    // 2. Only process payment_success events
-    if (payload.event_type !== "payment_success") {
+    // 2. Only process payment lifecycle events
+    const HANDLED_EVENTS = ["payment_success", "payment_failed", "payment_reversed"];
+    if (!HANDLED_EVENTS.includes(payload.event_type)) {
       console.log(`[webhooks/nomba] Ignoring event: ${payload.event_type}`);
       return NextResponse.json({ received: true });
     }
+
+    const isSuccess = payload.event_type === "payment_success";
+    const isFailed = payload.event_type === "payment_failed";
+    const isReversed = payload.event_type === "payment_reversed";
 
     // 3. Extract the order reference (our booking reference)
     // Nomba can include orderReference in different locations depending on payment method
@@ -85,7 +91,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "No orderReference" }, { status: 400 });
     }
 
-    console.log(`[webhooks/nomba] payment_success for orderRef: ${orderReference}, txId: ${transactionId}`);
+    console.log(`[webhooks/nomba] ${payload.event_type} for orderRef: ${orderReference}, txId: ${transactionId}`);
 
     // 4. Look up the booking by nomba_order_ref (primary lookup)
     let rows = await sql`
@@ -114,12 +120,124 @@ export async function POST(req: Request) {
 
     const booking = rows[0];
 
-    // 5. Idempotency guard — skip if already confirmed/paid
-    if (booking.payment_status === "paid" && booking.status === "confirmed") {
+    // 5. Idempotency guard — skip if already confirmed/paid (only for success events)
+    if (isSuccess && booking.payment_status === "paid" && booking.status === "confirmed") {
       console.log(`[webhooks/nomba] Booking ${booking.reference} already confirmed — ignoring duplicate`);
       return NextResponse.json({ received: true, message: "Already confirmed" });
     }
 
+    // ── Handle payment_failed / payment_reversed ─────────────────────────────
+    if (isFailed || isReversed) {
+      const newPaymentStatus = isReversed ? "reversed" : "failed";
+      const newStatus = "pending"; // revert to pending so admin can follow up
+
+      await sql`
+        UPDATE bookings SET
+          status               = ${newStatus},
+          payment_status       = ${newPaymentStatus},
+          nomba_transaction_id = ${transactionId},
+          updated_at           = NOW()
+        WHERE id = ${booking.id}::uuid
+      `;
+
+      console.log(`[webhooks/nomba] ⚠️ Booking ${booking.reference} payment ${newPaymentStatus}`);
+
+      // Notify admin so they can follow up with the customer
+      const transporter = createMailTransporter();
+      if (transporter) {
+        const year = new Date().getFullYear();
+        const dateLabel =
+          booking.start_date === booking.end_date
+            ? booking.start_date
+            : `${booking.start_date} → ${booking.end_date}`;
+        const eventLabel = isReversed ? "Payment Reversed" : "Payment Failed";
+        const eventEmoji = isReversed ? "↩️" : "❌";
+        const bgColour = isReversed ? "#7c3aed" : "#dc2626";
+
+        const adminFailHtml = `<!DOCTYPE html><html lang='en'><head><meta charset='UTF-8'></head>
+<body style='margin:0;padding:0;background:#f5f3ee;font-family:Helvetica,Arial,sans-serif;'>
+<table width='100%' cellpadding='0' cellspacing='0' style='background:#f5f3ee;padding:32px 0;'><tr><td align='center'>
+<table width='600' cellpadding='0' cellspacing='0' style='background:#fbf9f3;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,.1);'>
+<tr><td style='background:#0d0d0d;padding:28px 32px;text-align:center;'>
+<img src='${APP_URL}/logo.png' alt='${VENUE_NAME}' height='48' style='display:block;margin:0 auto 12px;'/>
+<p style='margin:4px 0 0;color:#c9a84c;font-size:13px;opacity:.9;'>${eventLabel}</p>
+</td></tr>
+<tr><td style='background:${bgColour};padding:12px 32px;'>
+<p style='margin:0;color:#fff;font-size:14px;font-weight:600;'>${eventEmoji} Booking ${booking.reference} — ${eventLabel}</p>
+</td></tr>
+<tr><td style='padding:28px 32px;'>
+<table width='100%' cellpadding='0' cellspacing='0'>
+<tr><td style='padding:5px 0;font-size:13px;color:#888;width:40%;'>Booking Ref</td><td style='padding:5px 0;font-size:13px;color:#222;font-weight:700;font-family:monospace;'>${booking.reference}</td></tr>
+<tr><td style='padding:5px 0;font-size:13px;color:#888;'>Customer</td><td style='padding:5px 0;font-size:13px;color:#222;font-weight:500;'>${booking.full_name} &lt;${booking.email}&gt;</td></tr>
+<tr><td style='padding:5px 0;font-size:13px;color:#888;'>Date(s)</td><td style='padding:5px 0;font-size:13px;color:#222;font-weight:500;'>${dateLabel}</td></tr>
+<tr><td style='padding:5px 0;font-size:13px;color:#888;'>Event Status</td><td style='padding:5px 0;font-size:13px;color:${bgColour};font-weight:700;'>${eventLabel}</td></tr>
+${transactionId ? `<tr><td style='padding:5px 0;font-size:13px;color:#888;'>Nomba Tx ID</td><td style='padding:5px 0;font-size:11px;color:#666;font-family:monospace;word-break:break-all;'>${transactionId}</td></tr>` : ""}
+</table>
+<p style='margin:20px 0 0;font-size:13px;color:#555;'>The booking slot remains pending. Please follow up with the customer to retry payment or cancel the reservation.</p>
+</td></tr>
+<tr><td style='background:#f5f3ee;padding:12px 32px;border-top:1px solid #e0e0e0;'>
+<p style='margin:0;font-size:11px;color:#999;text-align:center;'>Automated via Nomba webhook · © ${year} ${VENUE_NAME}</p>
+</td></tr>
+</table></td></tr></table></body></html>`;
+
+        try {
+          await transporter.sendMail({
+            from: `"${VENUE_NAME}" <${process.env.SMTP_EMAIL}>`,
+            to: NOTIFICATION_EMAIL,
+            subject: `${eventEmoji} ${eventLabel}: ${booking.reference} — ${booking.full_name} · ${dateLabel}`,
+            text: stripHtml(adminFailHtml),
+            html: adminFailHtml,
+          });
+        } catch (emailErr) {
+          console.error("[webhooks/nomba] Failed to send admin failure email:", emailErr);
+        }
+
+        // Also notify the customer so they can retry
+        const firstName = (booking.full_name || "there").split(" ")[0];
+        const customerRetryMsg = isReversed
+          ? `Your payment for booking <strong>${booking.reference}</strong> has been reversed. Please contact your bank or try a different payment method.`
+          : `Unfortunately, your payment for booking <strong>${booking.reference}</strong> was not successful. Please try again using a different card or bank transfer.`;
+
+        const customerFailHtml = `<!DOCTYPE html><html lang='en'><head><meta charset='UTF-8'></head>
+<body style='margin:0;padding:0;background:#f5f3ee;font-family:Helvetica,Arial,sans-serif;'>
+<table width='100%' cellpadding='0' cellspacing='0' style='background:#f5f3ee;padding:32px 0;'><tr><td align='center'>
+<table width='600' cellpadding='0' cellspacing='0' style='background:#fbf9f3;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,.1);'>
+<tr><td style='background:#0d0d0d;padding:28px 32px;text-align:center;'>
+<img src='${APP_URL}/logo.png' alt='${VENUE_NAME}' height='48' style='display:block;margin:0 auto 12px;'/>
+<p style='margin:4px 0 0;color:#c9a84c;font-size:13px;opacity:.9;'>${eventLabel}</p>
+</td></tr>
+<tr><td style='background:${bgColour};padding:12px 32px;'>
+<p style='margin:0;color:#fff;font-size:14px;font-weight:600;'>${eventEmoji} Action Required — ${eventLabel}</p>
+</td></tr>
+<tr><td style='padding:32px;'>
+<h2 style='margin:0 0 8px;color:#0d0d0d;font-size:20px;'>Hi ${firstName},</h2>
+<p style='margin:0 0 20px;color:#444;font-size:14px;line-height:1.7;'>${customerRetryMsg}</p>
+<p style='margin:0 0 20px;color:#444;font-size:14px;line-height:1.7;'>Your slot is still soft-reserved. Please <a href='${APP_URL}/#book' style='color:#c9a84c;font-weight:600;'>return to the booking page</a> and complete payment to secure your reservation.</p>
+<p style='margin:0;color:#444;font-size:14px;'>If you need assistance, contact us at <a href='mailto:${NOTIFICATION_EMAIL}' style='color:#c9a84c;'>${NOTIFICATION_EMAIL}</a>.</p>
+</td></tr>
+<tr><td style='background:#0d0d0d;padding:20px 32px;text-align:center;'>
+<p style='margin:0;font-size:11px;color:#c9a84c;opacity:.9;'>© ${new Date().getFullYear()} ${VENUE_NAME} · 29b Olorunnimbe Street, Wemabod Estate, Ikeja, Lagos</p>
+</td></tr>
+</table></td></tr></table></body></html>`;
+
+        try {
+          await transporter.sendMail({
+            from: `"${VENUE_NAME}" <${process.env.SMTP_EMAIL}>`,
+            to: booking.email,
+            replyTo: NOTIFICATION_EMAIL,
+            subject: `${eventEmoji} Payment ${isReversed ? "Reversed" : "Failed"} — ${VENUE_NAME} · Ref: ${booking.reference}`,
+            text: stripHtml(customerFailHtml),
+            html: customerFailHtml,
+          });
+        } catch (emailErr) {
+          console.error("[webhooks/nomba] Failed to send customer failure email:", emailErr);
+        }
+      }
+
+      return NextResponse.json({ received: true, updated: newPaymentStatus });
+    }
+
+    // ── Handle payment_success ───────────────────────────────────────────────
     // 6. Server-side transaction verification (do NOT rely on webhook alone)
     const verification = await verifyTransaction(orderReference, transactionId || undefined);
     if (!verification.success) {

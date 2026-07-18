@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -78,6 +78,12 @@ export function Booking() {
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
   const [busySlots, setBusySlots] = useState<{ startTime: string; endTime: string }[]>([]);
 
+  // Refs so Pay Now link survives any future state resets
+  const resultRef = useRef<HTMLDivElement>(null);
+  const stableCheckoutLink = useRef<string | null>(null);
+  const stableReference = useRef<string | null>(null);
+  const stableAmount = useRef<number | null>(null);
+
   const {
     register,
     handleSubmit,
@@ -147,8 +153,15 @@ export function Booking() {
         throw new Error(`HTTP ${res.status}`);
       }
       setReference(data.reference);
-      if (data.checkoutLink) setCheckoutLink(data.checkoutLink);
-      if (data.amount) setAmount(data.amount);
+      stableReference.current = data.reference;
+      if (data.checkoutLink) {
+        setCheckoutLink(data.checkoutLink);
+        stableCheckoutLink.current = data.checkoutLink;
+      }
+      if (data.amount) {
+        setAmount(data.amount);
+        stableAmount.current = data.amount;
+      }
     } catch (err) {
       console.error("[Booking] Submission failed:", err);
       toast.error("Submission failed", {
@@ -161,11 +174,16 @@ export function Booking() {
     setDateRange(undefined);
     setBusySlots([]);
     toast.success("Space reserved!", {
-      description: checkoutLink
+      description: stableCheckoutLink.current
         ? "Complete payment to confirm your slot."
         : "We'll send payment instructions to your email shortly.",
     });
     reset({ participants: 12, agreedToPolicy: undefined as any });
+
+    // Scroll the result panel into view after a short paint delay
+    setTimeout(() => {
+      resultRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }, 80);
   };
 
   return (
@@ -209,53 +227,6 @@ export function Booking() {
             </div>
 
             <form onSubmit={handleSubmit(onSubmit)} className="p-8 md:p-12" noValidate>
-              {submitSuccess && (
-                <div className="mb-6 rounded-xl border border-emerald-200 bg-emerald-50 p-5 text-emerald-800" role="status">
-                  <div className="flex items-center gap-2 font-semibold text-base">
-                    ✅ Booking request received!
-                  </div>
-                  <p className="mt-2 text-sm text-emerald-700">
-                    Your booking reference is:
-                  </p>
-                  <div className="mt-3 flex flex-wrap items-center gap-3">
-                    <div className="rounded-md bg-emerald-100 px-3 py-1.5 font-mono text-lg font-bold tracking-wider">
-                      {reference}
-                    </div>
-                    <Button type="button" variant="outline" size="sm" onClick={() => {
-                      navigator.clipboard.writeText(reference || "");
-                      toast.success("Reference copied!");
-                    }} className="h-9 bg-white hover:bg-emerald-100 hover:text-emerald-900 border-emerald-300">
-                      Copy
-                    </Button>
-                  </div>
-
-                  {checkoutLink ? (
-                    <div className="mt-4 rounded-lg border border-emerald-300 bg-emerald-100 p-4">
-                      <p className="text-sm font-semibold text-emerald-900 mb-1">💳 Complete your payment to confirm the slot</p>
-                      {amount && (
-                        <p className="text-emerald-800 font-medium mb-1">
-                          Amount due: <span className="font-bold">₦{amount.toLocaleString()}</span> (inc. VAT)
-                        </p>
-                      )}
-                      <p className="text-xs text-emerald-700 mb-3">
-                        Your time slot is soft-reserved for 6 hours. Payment must be completed before then to secure your booking.
-                      </p>
-                      <a
-                        href={checkoutLink}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-2 rounded-full bg-emerald-700 px-5 py-2 text-sm font-semibold text-white hover:bg-emerald-800 transition-colors"
-                      >
-                        Pay Now {amount ? `— ₦${amount.toLocaleString()}` : ""} →
-                      </a>
-                    </div>
-                  ) : (
-                    <p className="mt-3 text-xs text-emerald-700/80">
-                      We'll send payment instructions to your email shortly. You can safely close this page.
-                    </p>
-                  )}
-                </div>
-              )}
 
               <div className="grid gap-5 sm:grid-cols-2">
                 {/* Contact info */}
@@ -448,6 +419,74 @@ export function Booking() {
               <p className="mt-3 text-center text-[11px] text-muted-foreground">
                 By submitting, you agree to be contacted about your booking.
               </p>
+
+              {/* ── Post-submission result panel — always rendered below submit ── */}
+              {submitSuccess && (
+                <div
+                  ref={resultRef}
+                  className="mt-6 rounded-xl border border-emerald-200 bg-emerald-50 p-5 text-emerald-800"
+                  role="status"
+                  aria-live="polite"
+                >
+                  <div className="flex items-center gap-2 font-semibold text-base">
+                    ✅ Booking request received!
+                  </div>
+                  <p className="mt-2 text-sm text-emerald-700">
+                    Your booking reference is:
+                  </p>
+                  <div className="mt-3 flex flex-wrap items-center gap-3">
+                    <div className="rounded-md bg-emerald-100 px-3 py-1.5 font-mono text-lg font-bold tracking-wider">
+                      {stableReference.current ?? reference}
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        navigator.clipboard.writeText(stableReference.current ?? reference ?? "");
+                        toast.success("Reference copied!");
+                      }}
+                      className="h-9 bg-white hover:bg-emerald-100 hover:text-emerald-900 border-emerald-300"
+                    >
+                      Copy
+                    </Button>
+                  </div>
+
+                  {/* Pay Now — always shown when a checkout link was generated */}
+                  {(stableCheckoutLink.current ?? checkoutLink) ? (
+                    <div className="mt-4 rounded-lg border border-emerald-300 bg-emerald-100 p-4">
+                      <p className="text-sm font-semibold text-emerald-900 mb-1">💳 Complete your payment to confirm the slot</p>
+                      {(stableAmount.current ?? amount) && (
+                        <p className="text-emerald-800 font-medium mb-1">
+                          Amount due:{" "}
+                          <span className="font-bold">
+                            ₦{(stableAmount.current ?? amount)!.toLocaleString()}
+                          </span>{" "}
+                          (inc. VAT)
+                        </p>
+                      )}
+                      <p className="text-xs text-emerald-700 mb-3">
+                        Your slot is soft-reserved for 6 hours. Complete payment before then to secure your booking.
+                      </p>
+                      <a
+                        href={stableCheckoutLink.current ?? checkoutLink ?? "#"}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-2 rounded-full bg-emerald-700 px-6 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800 transition-colors shadow-sm"
+                      >
+                        Pay Now
+                        {(stableAmount.current ?? amount)
+                          ? ` — ₦${(stableAmount.current ?? amount)!.toLocaleString()}`
+                          : ""}{" "}→
+                      </a>
+                    </div>
+                  ) : (
+                    <p className="mt-3 text-xs text-emerald-700/80">
+                      We&apos;ll send payment instructions to your email shortly. You can safely close this page.
+                    </p>
+                  )}
+                </div>
+              )}
             </form>
           </div>
         </div>

@@ -45,10 +45,17 @@ export async function POST(req: Request) {
     const rawBody = await req.text();
     const payload = JSON.parse(rawBody);
 
+    // 1. Filter out unhandled events (like ping or setup verification) early
+    const HANDLED_EVENTS = ["payment_success", "payment_failed", "payment_reversed"];
+    if (!HANDLED_EVENTS.includes(payload.event_type)) {
+      console.log(`[webhooks/nomba] Ignoring unhandled event (or ping): ${payload.event_type}`);
+      return NextResponse.json({ received: true });
+    }
+
+    // 2. Verify HMAC signature for actual payment lifecycle events
     const nombaSignature = req.headers.get("nomba-signature") || req.headers.get("nomba-sig-value") || "";
     const nombaTimestamp = req.headers.get("nomba-timestamp") || "";
 
-    // 1. Verify HMAC signature (skip if no secret configured — log warning)
     if (WEBHOOK_SECRET) {
       const valid = verifyWebhookSignature(rawBody, WEBHOOK_SECRET, nombaSignature, nombaTimestamp, payload);
       if (!valid) {
@@ -57,13 +64,6 @@ export async function POST(req: Request) {
       }
     } else {
       console.warn("[webhooks/nomba] NOMBA_WEBHOOK_SECRET not set — skipping signature verification");
-    }
-
-    // 2. Only process payment lifecycle events
-    const HANDLED_EVENTS = ["payment_success", "payment_failed", "payment_reversed"];
-    if (!HANDLED_EVENTS.includes(payload.event_type)) {
-      console.log(`[webhooks/nomba] Ignoring event: ${payload.event_type}`);
-      return NextResponse.json({ received: true });
     }
 
     const isSuccess = payload.event_type === "payment_success";

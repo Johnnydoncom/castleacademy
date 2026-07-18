@@ -36,13 +36,13 @@ export function AdminSidebar() {
   const sidebarContent = (
     <div className="flex h-full flex-col">
       {/* Logo */}
-      <div className="flex items-center gap-3 px-6 py-5 border-b border-border/60">
-        <img src="/logo.png" alt="Castle Academy" className="h-8 w-auto invert dark:invert-0" />
+      <div className="flex items-center gap-3 px-6 py-5 border-b border-zinc-900">
+        <img src="/logo.png" alt="Castle Academy" className="h-8 w-auto" />
       </div>
 
       {/* Navigation */}
       <nav className="flex-1 px-3 py-4 space-y-0.5">
-        <p className="px-3 mb-2 text-[10px] font-semibold uppercase tracking-widest text-slate-400">
+        <p className="px-3 mb-2 text-[10px] font-semibold uppercase tracking-widest text-zinc-500">
           Management
         </p>
         {navItems.map((item) => {
@@ -56,11 +56,11 @@ export function AdminSidebar() {
               className={cn(
                 "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all",
                 active
-                  ? "bg-gold/10 text-royal-deep shadow-sm border border-gold/20"
-                  : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                  ? "bg-gold/15 text-gold shadow-sm border border-gold/30"
+                  : "text-zinc-400 hover:bg-zinc-900 hover:text-zinc-100"
               )}
             >
-              <Icon className={cn("h-4 w-4 shrink-0", active ? "text-gold" : "text-muted-foreground")} />
+              <Icon className={cn("h-4 w-4 shrink-0", active ? "text-gold" : "text-zinc-400")} />
               <span className="flex-1">{item.label}</span>
               {active && <ChevronRight className="h-3 w-3 text-gold" />}
             </Link>
@@ -69,10 +69,10 @@ export function AdminSidebar() {
       </nav>
 
       {/* Logout */}
-      <div className="p-3 border-t border-border/60">
+      <div className="p-3 border-t border-zinc-900">
         <button
           onClick={handleLogout}
-          className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-destructive hover:bg-destructive/10 transition-all"
+          className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-all"
         >
           <LogOut className="h-4 w-4" />
           Sign out
@@ -84,18 +84,18 @@ export function AdminSidebar() {
   return (
     <>
       {/* Desktop sidebar */}
-      <aside className="hidden lg:flex w-64 flex-col bg-cream border-r border-border shrink-0">
+      <aside className="hidden lg:flex w-64 flex-col bg-zinc-950 border-r border-zinc-900 shrink-0">
         {sidebarContent}
       </aside>
 
       {/* Mobile header bar */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 z-50 flex items-center justify-between bg-cream border-b border-border px-4 h-14 shadow-sm">
+      <div className="lg:hidden fixed top-0 left-0 right-0 z-50 flex items-center justify-between bg-zinc-950 border-b border-zinc-900 px-4 h-14 shadow-sm">
         <div className="flex items-center gap-2">
-          <img src="/logo.png" alt="Castle Academy" className="h-6 w-auto invert dark:invert-0" />
+          <img src="/logo.png" alt="Castle Academy" className="h-6 w-auto" />
         </div>
         <button
           onClick={() => setMobileOpen(true)}
-          className="p-2 rounded-lg hover:bg-slate-100 text-slate-600"
+          className="p-2 rounded-lg hover:bg-zinc-900 text-zinc-400 transition-colors"
           aria-label="Open navigation"
         >
           <Menu className="h-5 w-5" />
@@ -105,12 +105,12 @@ export function AdminSidebar() {
       {/* Mobile drawer overlay */}
       {mobileOpen && (
         <div className="lg:hidden fixed inset-0 z-50 flex">
-          <div className="absolute inset-0 bg-royal/40" onClick={() => setMobileOpen(false)} />
-          <aside className="relative w-72 bg-cream h-full flex flex-col shadow-2xl">
-            <div className="flex items-center justify-between px-4 py-4 border-b border-border">
-              <span className="text-sm font-bold text-foreground">Navigation</span>
-              <button onClick={() => setMobileOpen(false)} className="p-1.5 rounded-lg hover:bg-muted">
-                <X className="h-4 w-4 text-muted-foreground" />
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setMobileOpen(false)} />
+          <aside className="relative w-72 bg-zinc-950 h-full flex flex-col shadow-2xl">
+            <div className="flex items-center justify-between px-4 py-4 border-b border-zinc-900">
+              <span className="text-sm font-bold text-zinc-100">Navigation</span>
+              <button onClick={() => setMobileOpen(false)} className="p-1.5 rounded-lg hover:bg-zinc-900 transition-colors">
+                <X className="h-4 w-4 text-zinc-400" />
               </button>
             </div>
             {sidebarContent}

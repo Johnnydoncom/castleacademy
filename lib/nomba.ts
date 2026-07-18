@@ -97,6 +97,7 @@ async function refreshAccessToken(currentToken: string, refreshToken: string): P
   return json.data.access_token;
 }
 
+
 export interface CreateOrderParams {
   orderReference: string;
   amount: number; // in Naira

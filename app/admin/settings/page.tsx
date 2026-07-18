@@ -1,5 +1,6 @@
 import { VenueSettings } from "@/components/admin/venue-settings";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
+import { DangerZone } from "@/components/admin/danger-zone";
 
 export const metadata = {
   title: "Venue Settings — Castle Academy Admin",
@@ -13,6 +14,7 @@ export default function SettingsPage() {
         description="Configure opening hours and social media links."
       />
       <VenueSettings />
+      <DangerZone />
     </div>
   );
 }

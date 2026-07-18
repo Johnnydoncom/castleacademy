@@ -17,6 +17,7 @@ import {
 import { cn } from "@/lib/utils";
 
 const navItems = [
+  { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/bookings", label: "Bookings", icon: CalendarCheck },
   { href: "/admin/blocked-slots", label: "Blocked Slots", icon: BanIcon },
   { href: "/admin/settings", label: "Venue Settings", icon: Settings },
@@ -47,7 +48,9 @@ export function AdminSidebar() {
         </p>
         {navItems.map((item) => {
           const Icon = item.icon;
-          const active = pathname === item.href || pathname.startsWith(item.href + "/");
+          const active = item.href === "/admin" 
+            ? pathname === "/admin" 
+            : (pathname === item.href || pathname.startsWith(item.href + "/"));
           return (
             <Link
               key={item.href}

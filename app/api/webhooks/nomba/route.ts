@@ -238,11 +238,32 @@ ${transactionId ? `<tr><td style='padding:5px 0;font-size:13px;color:#888;'>Nomb
     }
 
     // ── Handle payment_success ───────────────────────────────────────────────
-    // 6. Server-side transaction verification (do NOT rely on webhook alone)
-    const verification = await verifyTransaction(orderReference, transactionId || undefined);
-    if (!verification.success) {
-      console.warn(`[webhooks/nomba] Transaction verification failed for ${orderReference}:`, verification.statusCode);
-      return NextResponse.json({ error: "Payment verification failed" }, { status: 402 });
+    // 6. Server-side transaction verification.
+    // On sandbox, verification endpoints are unreliable — we trust the signed webhook.
+    // On production with NOMBA_WEBHOOK_SECRET set, the HMAC already proves authenticity.
+    const isSandbox = (process.env.NOMBA_BASE_URL || "").includes("sandbox");
+    let verifiedPaymentMethod = paymentMethod;
+
+    if (!isSandbox) {
+      // Production: do a hard verify
+      const verification = await verifyTransaction(orderReference, transactionId || undefined);
+      if (!verification.success) {
+        console.warn(`[webhooks/nomba] Transaction verification failed for ${orderReference}:`, verification.statusCode);
+        return NextResponse.json({ error: "Payment verification failed" }, { status: 402 });
+      }
+      verifiedPaymentMethod = verification.paymentMethod || paymentMethod;
+      console.log(`[webhooks/nomba] ✅ Server-side verification passed for ${orderReference}`);
+    } else {
+      // Sandbox: skip hard verify — trust the webhook payload (already HMAC-verified above)
+      console.log(`[webhooks/nomba] ℹ️ Sandbox mode — skipping server-side transaction verification`);
+      // Attempt soft-verify but don't abort on failure
+      try {
+        const verification = await verifyTransaction(orderReference, transactionId || undefined);
+        if (verification.paymentMethod) verifiedPaymentMethod = verification.paymentMethod;
+        console.log(`[webhooks/nomba] Soft verify result: ${verification.statusCode}`);
+      } catch {
+        console.log(`[webhooks/nomba] Soft verify threw (sandbox) — proceeding anyway`);
+      }
     }
 
     // 7. Auto-confirm the booking
@@ -250,14 +271,14 @@ ${transactionId ? `<tr><td style='padding:5px 0;font-size:13px;color:#888;'>Nomb
       UPDATE bookings SET
         status               = 'confirmed',
         payment_status       = 'paid',
-        payment_method       = ${verification.paymentMethod || paymentMethod},
+        payment_method       = ${verifiedPaymentMethod},
         nomba_transaction_id = ${transactionId},
         paid_at              = NOW(),
         updated_at           = NOW()
       WHERE id = ${booking.id}::uuid
     `;
 
-    console.log(`[webhooks/nomba] ✅ Booking ${booking.reference} auto-confirmed (${verification.paymentMethod || paymentMethod})`);
+    console.log(`[webhooks/nomba] ✅ Booking ${booking.reference} auto-confirmed (${verifiedPaymentMethod})`);
 
     // 8. Send emails (customer confirmation + admin notification)
     const transporter = createMailTransporter();

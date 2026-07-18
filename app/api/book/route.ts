@@ -1,5 +1,5 @@
 import { NextResponse, after } from 'next/server';
-import { GoogleGenAI, Type, Schema } from '@google/genai';
+import Groq from 'groq-sdk';
 import { promises as fs } from 'fs';
 import path from 'path';
 import nodemailer from 'nodemailer';
@@ -13,15 +13,6 @@ const SUPPORT_WHATSAPP = process.env.SUPPORT_WHATSAPP || "2349042222296";
 const APP_URL = process.env.APP_URL || "https://thecastleacademy.com";
 const VAT_RATE = parseFloat(process.env.VAT_RATE || "7.5");
 
-const invoiceSchema: Schema = {
-  type: Type.OBJECT,
-  properties: {
-    totalPrice: { type: Type.INTEGER, description: "The final total price in Naira" },
-    discountApplied: { type: Type.STRING, description: "Name of the discount applied" },
-    breakdown: { type: Type.STRING, description: "Short explanation of the calculation" }
-  },
-  required: ["totalPrice", "discountApplied", "breakdown"],
-};
 
 function safe(v: any) { return v == null ? "" : String(v).trim(); }
 function formatExtras(v: any): string {
@@ -129,7 +120,7 @@ export async function POST(req: Request) {
 
     data.bookingRef = reference;
 
-    // ── 4. AI Pricing (synchronous — needed before Nomba order) ───────────
+    // ── 4. Pricing Calculation ─────────────────────────────────────────────
     let subtotal = 0;
     let vatAmount = 0;
     let vatTotal = 0;
@@ -137,50 +128,103 @@ export async function POST(req: Request) {
     let discountApplied = "";
 
     try {
+      if (!process.env.GROQ_API_KEY) {
+        throw new Error("Missing GROQ_API_KEY environment variable.");
+      }
+
       const pricingRulesPath = path.join(process.cwd(), 'pricing-rules.txt');
       const pricingRules = await fs.readFile(pricingRulesPath, 'utf-8');
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+      const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
-      const prompt = `You are an automated pricing engine for Castle Academy.
-        Here are the rules: ${pricingRules}
-        Calculate the price for this booking: ${JSON.stringify(data, null, 2)}
-        Provide totalPrice (number), discountApplied, and breakdown.`;
+      const prompt = `You are an automated pricing engine for Castle Academy, a training venue in Lagos, Nigeria.
+Here are the pricing rules:
+${pricingRules}
 
-      const aiRes = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: prompt,
-        config: { responseMimeType: 'application/json', responseSchema: invoiceSchema },
+Calculate the pre-VAT subtotal price for this booking:
+${JSON.stringify({
+  startDate, endDate, startTime, endTime,
+  participants: Number(participants),
+  eventType, extras
+}, null, 2)}
+
+Respond ONLY with valid JSON matching this schema exactly:
+{
+  "totalPrice": <integer, pre-VAT subtotal in Naira>,
+  "discountApplied": "<name of discount or 'None'>",
+  "breakdown": "<one-line explanation of the calculation>"
+}`;
+
+      const aiRes = await groq.chat.completions.create({
+        model: 'llama-3.3-70b-versatile',
+        messages: [{ role: 'user', content: prompt }],
+        response_format: { type: 'json_object' },
+        temperature: 0,
       });
 
-      const invoice = JSON.parse(aiRes.text || "{}");
+      const invoice = JSON.parse(aiRes.choices[0].message.content || '{}');
       subtotal = Number(invoice.totalPrice) || 0;
-      vatAmount = Math.round(subtotal * VAT_RATE / 100);
-      vatTotal = subtotal + vatAmount;
-      invoiceBreakdown = invoice.breakdown || "";
-      discountApplied = invoice.discountApplied || "";
+      invoiceBreakdown = invoice.breakdown || '';
+      discountApplied = invoice.discountApplied || '';
 
-      data.invoiceSubtotal = subtotal;
-      data.invoiceVatRate = VAT_RATE;
-      data.invoiceVatAmount = vatAmount;
-      data.invoiceTotal = vatTotal;
-      data.invoiceBreakdown = invoiceBreakdown;
-      data.discountApplied = discountApplied;
-
-      // Update booking row with invoice figures
-      await sql`
-        UPDATE bookings SET
-          invoice_subtotal  = ${subtotal},
-          invoice_vat       = ${vatAmount},
-          invoice_total     = ${vatTotal},
-          discount_applied  = ${discountApplied || null},
-          invoice_breakdown = ${invoiceBreakdown || null},
-          updated_at        = NOW()
-        WHERE reference = ${reference}
-      `;
+      console.log(`[API] Groq pricing: subtotal=₦${subtotal}, discount=${discountApplied}`);
     } catch (priceErr) {
-      // Non-fatal: booking still saved, admin can handle manually
-      console.error('[API] AI pricing failed:', priceErr);
+      console.warn('[API] AI pricing failed, using fallback algorithmic calculation:', (priceErr as Error).message);
+
+      // ── Fallback: deterministic algorithm from pricing-rules.txt ──────────
+      const start = new Date(`1970-01-01T${startTime}`);
+      const end = new Date(`1970-01-01T${endTime}`);
+      let hours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
+      if (hours <= 0) hours += 24;
+
+      const startDay = new Date(startDate);
+      const endDay = new Date(endDate);
+      const days = Math.round((endDay.getTime() - startDay.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+
+      let pricePerDay = 0;
+      if (hours <= 3) {
+        pricePerDay = 100000;
+        invoiceBreakdown = `3 Hours Package (₦100,000) × ${days} day${days > 1 ? 's' : ''}`;
+      } else if (hours <= 4) {
+        pricePerDay = 120000;
+        invoiceBreakdown = `4 Hours / Half Day (₦120,000) × ${days} day${days > 1 ? 's' : ''}`;
+      } else if (hours <= 8) {
+        pricePerDay = 180000;
+        invoiceBreakdown = `Full Day / 8 Hours (₦180,000) × ${days} day${days > 1 ? 's' : ''}`;
+      } else {
+        const extraHours = Math.ceil(hours - 8);
+        pricePerDay = 180000 + extraHours * 30000;
+        invoiceBreakdown = `Full Day + ${extraHours} Extra Hour${extraHours > 1 ? 's' : ''} (₦${pricePerDay.toLocaleString()}) × ${days} day${days > 1 ? 's' : ''}`;
+      }
+
+      subtotal = pricePerDay * days;
+      discountApplied = 'None (Fallback Calculation)';
     }
+
+    if (subtotal <= 0) {
+      return NextResponse.json({ success: false, error: "Failed to calculate pricing for this booking. Please contact support." }, { status: 400 });
+    }
+
+    vatAmount = Math.round(subtotal * VAT_RATE / 100);
+    vatTotal = subtotal + vatAmount;
+
+    data.invoiceSubtotal = subtotal;
+    data.invoiceVatRate = VAT_RATE;
+    data.invoiceVatAmount = vatAmount;
+    data.invoiceTotal = vatTotal;
+    data.invoiceBreakdown = invoiceBreakdown;
+    data.discountApplied = discountApplied;
+
+    // Update booking row with invoice figures
+    await sql`
+      UPDATE bookings SET
+        invoice_subtotal  = ${subtotal},
+        invoice_vat       = ${vatAmount},
+        invoice_total     = ${vatTotal},
+        discount_applied  = ${discountApplied || null},
+        invoice_breakdown = ${invoiceBreakdown || null},
+        updated_at        = NOW()
+      WHERE reference = ${reference}
+    `;
 
     // ── 5. Create Nomba checkout order (synchronous) ───────────────────────
     // This ensures checkoutLink is returned to the customer immediately.
@@ -209,9 +253,13 @@ export async function POST(req: Request) {
 
         console.log(`[API] Nomba checkout created for ${reference}: ${checkoutLink}`);
       } catch (nombaErr) {
-        // Non-fatal: booking still saved, admin can resend link or handle manually
+        // Fatal if payment cannot be setup for a priced booking
         console.error('[API] Nomba checkout creation failed:', nombaErr);
+        return NextResponse.json({ success: false, error: 'Payment gateway error. Please try again later.' }, { status: 502 });
       }
+    } else if (vatTotal > 0 && !isNombaConfigured()) {
+       console.error('[API] Nomba is not configured but booking requires payment.');
+       return NextResponse.json({ success: false, error: 'Payment gateway not configured. Please contact support.' }, { status: 500 });
     }
 
     // ── 6. Background: emails + GAS logging ───────────────────────────────

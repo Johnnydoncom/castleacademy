@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { createHmac, timingSafeEqual } from "crypto";
+import { sql } from "./db";
 
 const SECRET = process.env.ADMIN_SECRET;
 const COOKIE_NAME = "admin_session";
@@ -62,4 +63,44 @@ export async function isAuthenticated(): Promise<boolean> {
   const token = store.get(COOKIE_NAME)?.value;
   if (!token) return false;
   return verifyToken(token) !== null;
+}
+
+export interface AdminSession {
+  id: string;
+  username: string;
+  role: "owner" | "admin";
+}
+
+/**
+ * Resolve the current admin from the session cookie AND look up their
+ * live role from the database. Returns null if not authenticated.
+ * Token payload format from login: `admin:<uuid>:<timestamp>`.
+ */
+export async function getAdminSession(): Promise<AdminSession | null> {
+  const store = await cookies();
+  const token = store.get(COOKIE_NAME)?.value;
+  if (!token) return null;
+  const payload = verifyToken(token);
+  if (!payload) return null;
+
+  const parts = payload.split(":");
+  const id = parts[1]; // uuid has no colons
+  if (!id) return null;
+
+  try {
+    const rows = await sql`
+      SELECT id, username, role FROM admins WHERE id = ${id}::uuid LIMIT 1
+    `;
+    if (rows.length === 0) return null;
+    const r = rows[0] as { id: string; username: string; role: string };
+    return { id: r.id, username: r.username, role: (r.role === "owner" ? "owner" : "admin") };
+  } catch {
+    return null;
+  }
+}
+
+/** True if the current session belongs to an owner-level admin. */
+export async function isOwner(): Promise<boolean> {
+  const s = await getAdminSession();
+  return s?.role === "owner";
 }

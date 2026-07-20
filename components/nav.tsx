@@ -50,6 +50,12 @@ export function Nav() {
           ))}
         </nav>
         <div className="flex items-center gap-3">
+          <a
+            href="/account"
+            className="hidden text-[12px] font-medium uppercase tracking-[0.16em] text-white/70 transition-colors hover:text-gold md:inline-flex"
+          >
+            My Account
+          </a>
           <Button
             asChild
             className="hidden rounded-none border border-gold bg-transparent px-6 text-[12px] font-medium uppercase tracking-[0.18em] text-gold transition-all hover:bg-gold hover:text-royal-deep md:inline-flex"
@@ -83,6 +89,13 @@ export function Nav() {
                 {l.label}
               </a>
             ))}
+            <a
+              href="/account"
+              onClick={() => setOpen(false)}
+              className="py-2 text-sm font-medium uppercase tracking-[0.14em] text-white/80 hover:text-gold"
+            >
+              My Account
+            </a>
             <a
               href="#book"
               onClick={() => setOpen(false)}

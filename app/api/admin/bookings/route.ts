@@ -39,9 +39,11 @@ export async function GET(req: Request) {
              event_type, start_date::text, end_date::text,
              start_time::text, end_time::text, participants,
              status, payment_status, payment_method, invoice_total,
-             invoice_subtotal, invoice_vat, discount_applied,
+             invoice_subtotal, invoice_vat, discount_applied, invoice_number,
              agreed_to_policy, nomba_order_ref, nomba_transaction_id,
              checkout_link, paid_at,
+             reschedule_status, reschedule_date::text, reschedule_start_time::text,
+             reschedule_end_time::text, reschedule_reason,
              created_at, updated_at, notes
       FROM bookings
       WHERE (${isStatusAll} OR status = ${statusFilter})
@@ -92,6 +94,36 @@ export async function PATCH(req: Request) {
 
     if (!id) {
       return NextResponse.json({ error: "Missing booking id" }, { status: 400 });
+    }
+
+    // ── Reschedule approval: apply requested slot to the booking ──────────
+    if (action === "approve_reschedule") {
+      const rows = await sql`
+        SELECT reschedule_date::text AS d, reschedule_start_time::text AS s, reschedule_end_time::text AS e
+        FROM bookings WHERE id = ${id}::uuid LIMIT 1
+      `;
+      if (rows.length === 0 || !rows[0].d) {
+        return NextResponse.json({ error: "No pending reschedule request" }, { status: 400 });
+      }
+      await sql`
+        UPDATE bookings SET
+          start_date        = ${rows[0].d}::date,
+          end_date          = ${rows[0].d}::date,
+          start_time        = ${rows[0].s}::time,
+          end_time          = ${rows[0].e}::time,
+          reschedule_status = 'approved',
+          updated_at        = NOW()
+        WHERE id = ${id}::uuid
+      `;
+      return NextResponse.json({ success: true, message: "Reschedule approved and applied" });
+    }
+
+    if (action === "reject_reschedule") {
+      await sql`
+        UPDATE bookings SET reschedule_status = 'rejected', updated_at = NOW()
+        WHERE id = ${id}::uuid
+      `;
+      return NextResponse.json({ success: true, message: "Reschedule request declined" });
     }
 
     // Handle "mark as paid" action for offline/manual payments

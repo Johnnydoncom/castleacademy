@@ -134,7 +134,7 @@ export function AdminManagement() {
                   <div>
                     <div className="flex items-center gap-2">
                       <p className="font-semibold text-foreground">{admin.username}</p>
-                      {admin.username === "castacadmin" && (
+                      {(admin.role === "owner" || admin.username === "castacadmin") && (
                         <span className="px-2 py-0.5 rounded-full bg-gold/20 text-royal-deep text-[10px] font-bold uppercase tracking-widest">
                           Owner
                         </span>
@@ -146,7 +146,7 @@ export function AdminManagement() {
                   </div>
                 </div>
                 <div>
-                  {admin.username !== "castacadmin" && (
+                  {admin.username !== "castacadmin" && admin.role !== "owner" && (
                     <Button 
                       variant="ghost" 
                       size="icon" 

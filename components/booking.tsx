@@ -452,6 +452,11 @@ export function Booking() {
                     </Button>
                   </div>
 
+                  <p className="mt-3 text-xs text-emerald-700">
+                    Track this booking, download your invoice, or manage it anytime in{" "}
+                    <a href="/account" className="font-semibold underline underline-offset-2">My Account</a>.
+                  </p>
+
                   {/* Pay Now — always shown when a checkout link was generated */}
                   {(stableCheckoutLink.current ?? checkoutLink) ? (
                     <div className="mt-4 rounded-lg border border-emerald-300 bg-emerald-100 p-4">

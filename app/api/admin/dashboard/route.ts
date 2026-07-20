@@ -1,19 +1,14 @@
 import { NextResponse } from "next/server";
 import { sql } from "@/lib/db";
-import { verifyToken } from "@/lib/auth";
-import { cookies } from "next/headers";
-
-async function checkAuth() {
-  const store = await cookies();
-  const token = store.get("admin_session")?.value;
-  if (!token) return false;
-  return verifyToken(token) !== null;
-}
+import { getAdminSession } from "@/lib/auth";
 
 export async function GET() {
-  if (!(await checkAuth())) {
+  const session = await getAdminSession();
+  if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  // Revenue figures are sensitive — owner-only.
+  const canSeeRevenue = session.role === "owner";
 
   try {
     // 1. Core metrics
@@ -54,16 +49,21 @@ export async function GET() {
     `;
 
     return NextResponse.json({
+      role: session.role,
+      canSeeRevenue,
       metrics: {
         totalBookings: Number(metrics.total_bookings),
         confirmedBookings: Number(metrics.confirmed_bookings),
         pendingBookings: Number(metrics.pending_bookings),
-        totalRevenue: Number(metrics.total_revenue),
+        // Only expose revenue to owners; null for regular admins.
+        totalRevenue: canSeeRevenue ? Number(metrics.total_revenue) : null,
       },
-      revenueChart: revenueData.map(r => ({
-        date: new Date(r.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-        revenue: Number(r.revenue)
-      })),
+      revenueChart: canSeeRevenue
+        ? revenueData.map(r => ({
+            date: new Date(r.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+            revenue: Number(r.revenue)
+          }))
+        : null,
       upcoming: upcomingData,
     });
   } catch (err) {

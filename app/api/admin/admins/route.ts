@@ -1,14 +1,11 @@
 import { NextResponse } from "next/server";
 import { sql } from "@/lib/db";
-import { cookies } from "next/headers";
-import { verifyToken } from "@/lib/auth";
+import { isOwner } from "@/lib/auth";
 import bcrypt from "bcryptjs";
 
+// Admin-account management is owner-only.
 async function checkAuth() {
-  const store = await cookies();
-  const token = store.get("admin_session")?.value;
-  if (!token) return false;
-  return verifyToken(token) !== null;
+  return isOwner();
 }
 
 export async function GET() {
@@ -18,8 +15,8 @@ export async function GET() {
 
   try {
     const rows = await sql`
-      SELECT id, username, created_at 
-      FROM admins 
+      SELECT id, username, role, created_at
+      FROM admins
       ORDER BY created_at ASC
     `;
     return NextResponse.json({ admins: rows });
@@ -78,9 +75,9 @@ export async function DELETE(req: Request) {
     }
 
     // Prevent deleting the default admin
-    const admin = await sql`SELECT username FROM admins WHERE id = ${id}::uuid LIMIT 1`;
-    if (admin.length > 0 && admin[0].username === "castacadmin") {
-      return NextResponse.json({ error: "Cannot delete the default admin" }, { status: 403 });
+    const admin = await sql`SELECT username, role FROM admins WHERE id = ${id}::uuid LIMIT 1`;
+    if (admin.length > 0 && (admin[0].username === "castacadmin" || admin[0].role === "owner")) {
+      return NextResponse.json({ error: "Cannot delete the owner account" }, { status: 403 });
     }
 
     await sql`DELETE FROM admins WHERE id = ${id}::uuid`;

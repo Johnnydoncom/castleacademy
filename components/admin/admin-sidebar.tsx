@@ -2,7 +2,7 @@
 
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   CalendarCheck,
   BanIcon,
@@ -17,17 +17,28 @@ import {
 import { cn } from "@/lib/utils";
 
 const navItems = [
-  { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/admin/bookings", label: "Bookings", icon: CalendarCheck },
-  { href: "/admin/blocked-slots", label: "Blocked Slots", icon: BanIcon },
-  { href: "/admin/settings", label: "Venue Settings", icon: Settings },
-  { href: "/admin/admins", label: "Admin Accounts", icon: Users },
+  { href: "/admin", label: "Dashboard", icon: LayoutDashboard, ownerOnly: false },
+  { href: "/admin/bookings", label: "Bookings", icon: CalendarCheck, ownerOnly: false },
+  { href: "/admin/blocked-slots", label: "Blocked Slots", icon: BanIcon, ownerOnly: false },
+  { href: "/admin/settings", label: "Venue Settings", icon: Settings, ownerOnly: true },
+  { href: "/admin/admins", label: "Admin Accounts", icon: Users, ownerOnly: true },
 ];
 
 export function AdminSidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [me, setMe] = useState<{ username: string; role: string } | null>(null);
+
+  useEffect(() => {
+    fetch("/api/admin/me")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => data && setMe({ username: data.username, role: data.role }))
+      .catch(() => {});
+  }, []);
+
+  const isOwner = me?.role === "owner";
+  const visibleItems = navItems.filter((i) => !i.ownerOnly || isOwner);
 
   const handleLogout = async () => {
     await fetch("/api/admin/auth", { method: "DELETE" });
@@ -46,7 +57,7 @@ export function AdminSidebar() {
         <p className="px-3 mb-2 text-[10px] font-semibold uppercase tracking-widest text-zinc-500">
           Management
         </p>
-        {navItems.map((item) => {
+        {visibleItems.map((item) => {
           const Icon = item.icon;
           const active = item.href === "/admin" 
             ? pathname === "/admin" 
@@ -71,8 +82,19 @@ export function AdminSidebar() {
         })}
       </nav>
 
-      {/* Logout */}
-      <div className="p-3 border-t border-zinc-900">
+      {/* Account + Logout */}
+      <div className="p-3 border-t border-zinc-900 space-y-1">
+        {me && (
+          <div className="flex items-center gap-2 px-3 py-2">
+            <div className="h-7 w-7 shrink-0 rounded-full bg-gold/20 text-gold flex items-center justify-center text-xs font-bold">
+              {me.username.charAt(0).toUpperCase()}
+            </div>
+            <div className="min-w-0">
+              <p className="truncate text-xs font-medium text-zinc-200">{me.username}</p>
+              <p className="text-[10px] uppercase tracking-widest text-gold">{me.role}</p>
+            </div>
+          </div>
+        )}
         <button
           onClick={handleLogout}
           className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-all"

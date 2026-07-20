@@ -1,13 +1,10 @@
 import { NextResponse } from "next/server";
 import { sql } from "@/lib/db";
-import { verifyToken } from "@/lib/auth";
-import { cookies } from "next/headers";
+import { isOwner } from "@/lib/auth";
 
+// Venue hours are an owner-only setting.
 async function checkAuth() {
-  const store = await cookies();
-  const token = store.get("admin_session")?.value;
-  if (!token) return false;
-  return verifyToken(token) !== null;
+  return isOwner();
 }
 
 /** GET /api/admin/venue-hours — returns all 7 days */

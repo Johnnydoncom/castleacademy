@@ -30,6 +30,10 @@ import {
   Clock,
   XCircle,
   Banknote,
+  FileText,
+  CalendarClock,
+  Check,
+  X,
 } from "lucide-react";
 import {
   Tooltip,
@@ -104,6 +108,22 @@ export function BookingsTable() {
     }
   };
 
+  const rescheduleAction = async (id: string, action: "approve_reschedule" | "reject_reschedule") => {
+    try {
+      const res = await fetch("/api/admin/bookings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, action }),
+      });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error);
+      toast.success(d.message || "Done");
+      fetchBookings();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed");
+    }
+  };
+
   const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
     toast.success(`${label} copied!`);
@@ -139,6 +159,16 @@ export function BookingsTable() {
           >
             <XCircle className="h-3 w-3" />
             Cancelled
+          </Badge>
+        );
+      case "expired":
+        return (
+          <Badge
+            variant="secondary"
+            className="bg-zinc-100 text-zinc-600 hover:bg-zinc-200 border-transparent shadow-none gap-1"
+          >
+            <Clock className="h-3 w-3" />
+            Expired
           </Badge>
         );
       default:
@@ -232,6 +262,7 @@ export function BookingsTable() {
               <SelectItem value="pending">Pending</SelectItem>
               <SelectItem value="confirmed">Confirmed</SelectItem>
               <SelectItem value="cancelled">Cancelled</SelectItem>
+              <SelectItem value="expired">Expired</SelectItem>
             </SelectContent>
           </Select>
           <Select
@@ -392,6 +423,51 @@ export function BookingsTable() {
                       {/* Actions */}
                       <TableCell className="text-right">
                         <div className="flex flex-col items-end gap-2">
+                          {/* Reschedule request — approve / decline */}
+                          {b.reschedule_status === "requested" && (
+                            <div className="w-full max-w-[220px] rounded-lg border border-violet-200 bg-violet-50 p-2 text-left">
+                              <p className="flex items-center gap-1 text-[11px] font-semibold text-violet-700">
+                                <CalendarClock className="h-3 w-3" /> Reschedule requested
+                              </p>
+                              <p className="mt-0.5 text-[10px] text-violet-600">
+                                → {b.reschedule_date} {b.reschedule_start_time?.slice(0, 5)}–{b.reschedule_end_time?.slice(0, 5)}
+                              </p>
+                              {b.reschedule_reason && (
+                                <p className="mt-0.5 text-[10px] italic text-violet-500">{b.reschedule_reason}</p>
+                              )}
+                              <div className="mt-1.5 flex gap-1">
+                                <Button size="sm" className="h-6 flex-1 gap-1 bg-violet-600 text-[10px] text-white hover:bg-violet-700" onClick={() => rescheduleAction(b.id, "approve_reschedule")}>
+                                  <Check className="h-3 w-3" /> Approve
+                                </Button>
+                                <Button size="sm" variant="outline" className="h-6 flex-1 gap-1 text-[10px]" onClick={() => rescheduleAction(b.id, "reject_reschedule")}>
+                                  <X className="h-3 w-3" /> Decline
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Invoice / receipt PDF */}
+                          <div className="flex items-center gap-2">
+                            <a
+                              href={`/api/admin/invoice/${b.reference}?type=invoice`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+                            >
+                              <FileText className="h-3 w-3" /> Invoice
+                            </a>
+                            {b.payment_status === "paid" && (
+                              <a
+                                href={`/api/admin/invoice/${b.reference}?type=receipt`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+                              >
+                                <FileText className="h-3 w-3" /> Receipt
+                              </a>
+                            )}
+                          </div>
+
                           {/* Status change dropdown */}
                           <Select
                             value={b.status}

@@ -217,11 +217,18 @@ export default function BookingCallbackPage() {
               </div>
 
               <p className="text-gray-500 text-sm leading-relaxed">
-                A confirmation email has been sent to you. If you have any questions, please contact us at{" "}
+                A confirmation email with your receipt has been sent to you. If you have any questions, please contact us at{" "}
                 <a href="mailto:thecastleacademyspace@gmail.com" className="text-[#c9a84c] underline">
                   thecastleacademyspace@gmail.com
                 </a>
               </p>
+
+              <Link
+                href="/account"
+                className="block w-full rounded-full bg-[#c9a84c] py-2.5 text-center text-sm font-semibold text-[#0d0d0d] hover:bg-[#d9b95c] transition-colors"
+              >
+                Manage this booking in My Account →
+              </Link>
             </div>
 
             <div className="bg-[#0d0d0d] px-8 py-4 flex gap-3">

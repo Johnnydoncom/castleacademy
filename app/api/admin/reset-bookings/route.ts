@@ -1,13 +1,10 @@
 import { NextResponse } from "next/server";
 import { sql } from "@/lib/db";
-import { verifyToken } from "@/lib/auth";
-import { cookies } from "next/headers";
+import { isOwner } from "@/lib/auth";
 
+// Destructive reset is owner-only.
 async function checkAuth() {
-  const store = await cookies();
-  const token = store.get("admin_session")?.value;
-  if (!token) return false;
-  return verifyToken(token) !== null;
+  return isOwner();
 }
 
 export async function DELETE() {

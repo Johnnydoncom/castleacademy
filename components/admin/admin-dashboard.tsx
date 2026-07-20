@@ -49,15 +49,21 @@ export function AdminDashboard() {
       />
       
       <DashboardMetrics metrics={data.metrics} />
-      
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-auto lg:h-[400px]">
-        <div className="lg:col-span-2 h-full">
-          <DashboardChart data={data.revenueChart} />
+
+      {data.revenueChart ? (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-auto lg:h-[400px]">
+          <div className="lg:col-span-2 h-full">
+            <DashboardChart data={data.revenueChart} />
+          </div>
+          <div className="lg:col-span-1 h-full">
+            <DashboardUpcoming events={data.upcoming} />
+          </div>
         </div>
-        <div className="lg:col-span-1 h-full">
+      ) : (
+        <div className="h-auto lg:h-[400px]">
           <DashboardUpcoming events={data.upcoming} />
         </div>
-      </div>
+      )}
     </div>
   );
 }

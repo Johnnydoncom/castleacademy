@@ -4,7 +4,7 @@ interface Metrics {
   totalBookings: number;
   confirmedBookings: number;
   pendingBookings: number;
-  totalRevenue: number;
+  totalRevenue: number | null;
 }
 
 export function DashboardMetrics({ metrics }: { metrics: Metrics }) {
@@ -12,14 +12,19 @@ export function DashboardMetrics({ metrics }: { metrics: Metrics }) {
     return new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN', maximumFractionDigits: 0 }).format(amount);
   };
 
+  // Revenue is owner-only; the API sends null for regular admins.
+  const showRevenue = metrics.totalRevenue !== null && metrics.totalRevenue !== undefined;
+
   const cards = [
-    {
-      title: "Total Revenue",
-      value: formatCurrency(metrics.totalRevenue),
-      icon: Banknote,
-      color: "text-emerald-600 dark:text-emerald-400",
-      bg: "bg-emerald-100 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900/50",
-    },
+    ...(showRevenue
+      ? [{
+          title: "Total Revenue",
+          value: formatCurrency(metrics.totalRevenue as number),
+          icon: Banknote,
+          color: "text-emerald-600 dark:text-emerald-400",
+          bg: "bg-emerald-100 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900/50",
+        }]
+      : []),
     {
       title: "Total Bookings",
       value: metrics.totalBookings,

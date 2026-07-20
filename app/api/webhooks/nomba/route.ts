@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { verifyWebhookSignature, verifyTransaction } from "@/lib/nomba";
+import { generateBookingPdf, type InvoiceBooking } from "@/lib/invoice";
 import nodemailer from "nodemailer";
 
 const VENUE_NAME = process.env.VENUE_NAME || "Castle Academy";
@@ -95,8 +96,10 @@ export async function POST(req: Request) {
 
     // 4. Look up the booking by nomba_order_ref (primary lookup)
     let rows = await sql`
-      SELECT id, reference, email, full_name, start_date::text, end_date::text,
-             start_time::text, end_time::text, status, payment_status, invoice_total
+      SELECT id, reference, email, full_name, organisation, event_type, participants,
+             start_date::text, end_date::text, start_time::text, end_time::text,
+             status, payment_status, payment_method, invoice_subtotal, invoice_vat,
+             invoice_total, discount_applied, invoice_breakdown, invoice_number, paid_at
       FROM bookings
       WHERE nomba_order_ref = ${orderReference}
       LIMIT 1
@@ -105,8 +108,10 @@ export async function POST(req: Request) {
     // Fallback: match by booking reference directly (orderReference === CA-YYYYMMDD-XXXXXX)
     if (rows.length === 0) {
       rows = await sql`
-        SELECT id, reference, email, full_name, start_date::text, end_date::text,
-               start_time::text, end_time::text, status, payment_status, invoice_total
+        SELECT id, reference, email, full_name, organisation, event_type, participants,
+               start_date::text, end_date::text, start_time::text, end_time::text,
+               status, payment_status, payment_method, invoice_subtotal, invoice_vat,
+               invoice_total, discount_applied, invoice_breakdown, invoice_number, paid_at
         FROM bookings
         WHERE reference = ${orderReference}
         LIMIT 1
@@ -332,6 +337,37 @@ ${amountStr ? `<tr><td style='padding:5px 0;font-size:13px;color:#888;'>Amount P
 </td></tr>
 </table></td></tr></table></body></html>`;
 
+      // Generate a paid receipt PDF to attach to the confirmation email.
+      let receiptAttachment: { filename: string; content: Buffer }[] = [];
+      try {
+        const receiptBooking: InvoiceBooking = {
+          reference: booking.reference,
+          invoice_number: booking.invoice_number,
+          full_name: booking.full_name,
+          organisation: booking.organisation,
+          email: booking.email,
+          event_type: booking.event_type,
+          start_date: booking.start_date,
+          end_date: booking.end_date,
+          start_time: booking.start_time,
+          end_time: booking.end_time,
+          participants: booking.participants,
+          invoice_subtotal: booking.invoice_subtotal,
+          invoice_vat: booking.invoice_vat,
+          invoice_total: booking.invoice_total,
+          discount_applied: booking.discount_applied,
+          invoice_breakdown: booking.invoice_breakdown,
+          status: "confirmed",
+          payment_status: "paid",
+          payment_method: verifiedPaymentMethod,
+          paid_at: new Date().toISOString(),
+        };
+        const pdf = await generateBookingPdf(receiptBooking, "receipt");
+        receiptAttachment = [{ filename: `Receipt-${booking.reference}.pdf`, content: pdf }];
+      } catch (pdfErr) {
+        console.error("[webhooks/nomba] Receipt PDF generation failed:", pdfErr);
+      }
+
       try {
         await transporter.sendMail({
           from: `"${VENUE_NAME}" <${process.env.SMTP_EMAIL}>`,
@@ -340,6 +376,7 @@ ${amountStr ? `<tr><td style='padding:5px 0;font-size:13px;color:#888;'>Amount P
           subject: `✅ Booking Confirmed — ${VENUE_NAME} · Ref: ${booking.reference}`,
           text: stripHtml(customerHtml),
           html: customerHtml,
+          attachments: receiptAttachment,
         });
       } catch (emailErr) {
         console.error("[webhooks/nomba] Failed to send customer email:", emailErr);

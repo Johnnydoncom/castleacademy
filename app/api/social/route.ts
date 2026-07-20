@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { sql } from "@/lib/db";
-import { verifyToken } from "@/lib/auth";
-import { cookies } from "next/headers";
+import { getAdminSession } from "@/lib/auth";
 
 const SUPPORTED_PLATFORMS = [
   "facebook", "instagram", "twitter", "tiktok", "youtube", "linkedin",
@@ -33,21 +32,21 @@ export async function GET() {
  * Body: { platform: string, url: string }
  */
 export async function PUT(req: Request) {
+  // Social links are an owner-only venue setting.
   let isAuthorized = false;
   const secret = req.headers.get("x-admin-secret");
-  
+
   if (secret && secret === process.env.ADMIN_SECRET) {
     isAuthorized = true;
   } else {
-    const store = await cookies();
-    const token = store.get("admin_session")?.value;
-    if (token && verifyToken(token)) {
+    const session = await getAdminSession();
+    if (session?.role === "owner") {
       isAuthorized = true;
     }
   }
 
   if (!isAuthorized) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: "Forbidden — owner access required" }, { status: 403 });
   }
 
   try {

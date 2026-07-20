@@ -6,6 +6,8 @@ import nodemailer from 'nodemailer';
 import { randomBytes } from 'crypto';
 import { sql } from '@/lib/db';
 import { createCheckoutOrder } from '@/lib/nomba';
+import { generateBookingPdf, type InvoiceBooking } from '@/lib/invoice';
+import { getCustomerSession } from '@/lib/customer-auth';
 
 const VENUE_NAME = process.env.VENUE_NAME || "Castle Academy";
 const NOTIFICATION_EMAIL = process.env.NOTIFICATION_EMAIL || "thecastleacademyspace@gmail.com";
@@ -119,6 +121,14 @@ export async function POST(req: Request) {
     `;
 
     data.bookingRef = reference;
+
+    // Link this booking to a signed-in customer account, if any.
+    try {
+      const customerSession = await getCustomerSession();
+      if (customerSession) {
+        await sql`UPDATE bookings SET customer_id = ${customerSession.id}::uuid WHERE reference = ${reference}`;
+      }
+    } catch { /* guest booking — ignore */ }
 
     // ── 4. Pricing Calculation ─────────────────────────────────────────────
     let subtotal = 0;
@@ -378,13 +388,44 @@ Respond ONLY with valid JSON matching this schema exactly:
               </td></tr>
               </table></td></tr></table></body></html>`;
 
+            // Attach a pro-forma invoice PDF for the customer.
+            let invoiceAttachment: { filename: string; content: Buffer }[] = [];
+            try {
+              const invoiceBooking: InvoiceBooking = {
+                reference,
+                full_name: fullName,
+                organisation: organisation ?? null,
+                email,
+                phone,
+                event_type: eventType,
+                start_date: startDate,
+                end_date: endDate,
+                start_time: startTime,
+                end_time: endTime,
+                participants: Number(participants),
+                extras: Array.isArray(extras) ? extras : null,
+                invoice_subtotal: subtotal,
+                invoice_vat: vatAmount,
+                invoice_total: vatTotal,
+                discount_applied: discountApplied,
+                invoice_breakdown: invoiceBreakdown,
+                status: "pending",
+                payment_status: "unpaid",
+              };
+              const pdf = await generateBookingPdf(invoiceBooking, "invoice");
+              invoiceAttachment = [{ filename: `Invoice-${reference}.pdf`, content: pdf }];
+            } catch (pdfErr) {
+              console.error("[API] Invoice PDF generation failed:", pdfErr);
+            }
+
             await transporter.sendMail({
               from: `"${VENUE_NAME}" <${process.env.SMTP_EMAIL}>`,
               to: email,
               replyTo: NOTIFICATION_EMAIL,
               subject: `Your ${VENUE_NAME} booking request — Ref: ${reference}`,
               text: stripHtml(customerHtml),
-              html: customerHtml
+              html: customerHtml,
+              attachments: invoiceAttachment,
             });
           }
         }

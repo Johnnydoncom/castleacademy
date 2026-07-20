@@ -4,9 +4,9 @@ const nextConfig: NextConfig = {
   images: {
     unoptimized: true,
   },
-  // pdfkit ships .afm font-metric files it reads from disk at runtime.
-  // Keep it external so the server bundle doesn't try to inline those assets.
-  serverExternalPackages: ["pdfkit"],
+  // pdfkit and nodemailer are Node.js-only packages — keep them external so
+  // neither webpack nor Turbopack tries to bundle their binary/native assets.
+  serverExternalPackages: ["pdfkit", "nodemailer"],
 };
 
 export default nextConfig;

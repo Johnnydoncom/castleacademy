@@ -18,8 +18,8 @@ export interface InvoiceBooking {
   email: string;
   phone: string | null;
   event_type: string;
-  start_date: string;
-  end_date: string;
+  start_date: string | Date;
+  end_date: string | Date;
   start_time: string;
   end_time: string;
   participants: number;
@@ -47,19 +47,14 @@ const CW = MR - ML; // content width
 
 const C_NOIR  = rgb(0.051, 0.051, 0.051); // #0d0d0d
 const C_GOLD  = rgb(0.788, 0.659, 0.298); // #c9a84c
-const C_INK   = rgb(0.133, 0.133, 0.133); // #222222
 const C_MUTED = rgb(0.467, 0.467, 0.467); // #777777
 const C_LINE  = rgb(0.886, 0.867, 0.824); // #e2ddd2
-const C_CREAM = rgb(0.984, 0.976, 0.953); // #fbf9f3
 const C_WHITE = rgb(1, 1, 1);
 const C_GREEN = rgb(0.086, 0.635, 0.235); // #16a34a
-const C_GREEN_BG = rgb(0.922, 0.980, 0.941);
-const C_GRAY  = rgb(0.400, 0.400, 0.400);
 
 // ── Coordinate helpers ────────────────────────────────────────────────────────
-// pdf-lib uses bottom-left origin; we track Y from the top like pdfkit.
+// pdf-lib uses bottom-left origin; we track Y from the top.
 
-/** Convert from-top Y to pdf-lib from-bottom Y. */
 const py = (fromTop: number) => PAGE_H - fromTop;
 
 /** Strip non-WinAnsi characters to prevent pdf-lib encoding crashes. */
@@ -73,7 +68,7 @@ function cln(text: string | null | undefined | number): string {
     .replace(/[^\x20-\x7E\xA0-\xFF]/g, "");
 }
 
-/** Draw text at a from-top Y position. */
+/** Draw text at a from-top Y position. topY is the visual TOP of the text. */
 function dt(
   page: PDFPage,
   content: string | number,
@@ -85,7 +80,9 @@ function dt(
 ): void {
   const safe = cln(content);
   if (!safe) return;
-  page.drawText(safe, { x, y: py(topY), font, size, color });
+  // In pdf-lib, y is the baseline. 
+  // We approximate the baseline as topY + size * 0.75 (Helvetica ascent is ~0.75)
+  page.drawText(safe, { x, y: py(topY + size * 0.75), font, size, color });
 }
 
 /** Draw right-aligned text. */
@@ -133,7 +130,7 @@ function dr(
 ): void {
   page.drawRectangle({
     x,
-    y: py(topY + height),
+    y: py(topY + height), // y is bottom-left
     width,
     height,
     color,
@@ -174,21 +171,23 @@ function wrap(text: string, font: PDFFont, size: number, maxWidth: number): stri
   return lines.length ? lines : [safe];
 }
 
-/** NGN prefix instead of ₦ — standard PDF fonts are Latin-only. */
 function money(n: number | null | undefined): string {
   return `NGN ${Number(n ?? 0).toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
-function fmtDate(d: string): string {
+function fmtDate(d: string | Date | null | undefined): string {
+  if (!d) return "";
   try {
-    return new Date(d + "T12:00:00").toLocaleDateString("en-GB", {
+    const dateObj = typeof d === "string" ? new Date(d + (d.includes("T") ? "" : "T12:00:00")) : d;
+    if (isNaN(dateObj.getTime())) return String(d);
+    return dateObj.toLocaleDateString("en-GB", {
       weekday: "short",
       day: "numeric",
       month: "long",
       year: "numeric",
     });
   } catch {
-    return d;
+    return String(d);
   }
 }
 
@@ -219,156 +218,151 @@ export async function generateBookingPdf(booking: InvoiceBooking, kind: DocKind)
   const invNo     = booking.invoice_number           || booking.reference;
   const docLabel  = kind === "receipt" ? "RECEIPT" : "TAX INVOICE";
 
-  // ── Page background ─────────────────────────────────────────────────────────
-  dr(page, 0, 0, PAGE_W, PAGE_H, C_CREAM);
+  // Top accent border
+  dr(page, 0, 0, PAGE_W, 12, C_GOLD);
+  
+  let cy = 50;
 
-  // ── Header (dark bar) ───────────────────────────────────────────────────────
-  dr(page, 0, 0, PAGE_W, 90, C_NOIR);
+  // ── Header ────────────────────────────────────────────────────────────────
+  dt(page, venueName.toUpperCase(), ML, cy, bold, 22, C_NOIR);
+  dtR(page, docLabel, MR, cy, bold, 20, C_GOLD);
 
-  dt(page, venueName.toUpperCase(), ML, 22, bold, 15, C_WHITE);
-  dt(page, "29b Olorunnimbe Street, Wemabod Estate, Adeniyi Jones, Ikeja, Lagos", ML, 42, reg, 7, C_GOLD);
-  dt(page, "thecastleacademyspace@gmail.com  |  +234 904 222 2296", ML, 56, reg, 7, C_MUTED);
+  cy += 28;
+  dt(page, "29b Olorunnimbe Street, Wemabod Estate, Adeniyi Jones, Ikeja, Lagos", ML, cy, reg, 8, C_MUTED);
+  dtR(page, `Reference: ${booking.reference}`, MR, cy, reg, 9, C_MUTED);
 
-  dtR(page, docLabel, MR, 22, bold, 14, C_WHITE);
-  dtR(page, `No. ${invNo}`, MR, 40, reg, 8, C_MUTED);
-  dtR(page, today, MR, 54, reg, 8, C_MUTED);
+  cy += 12;
+  dt(page, "thecastleacademyspace@gmail.com  |  +234 904 222 2296", ML, cy, reg, 8, C_MUTED);
+  dtR(page, `Date: ${today}`, MR, cy, reg, 9, C_MUTED);
 
-  // Gold accent line
-  dr(page, 0, 90, PAGE_W, 7, C_GOLD);
+  cy += 40;
+  hl(page, ML, MR, cy, C_LINE, 1.5);
+  cy += 30;
 
-  let cy = 115;
+  // ── Bill To & Booking Details ─────────────────────────────────────────────
+  const colW = (CW - 40) / 2;
+  const col2X = ML + colW + 40;
 
-  // ── Bill To  +  Booking Details (two columns) ───────────────────────────────
-  const col2X = ML + CW / 2 + 15;
-  const colW  = CW / 2 - 20;
+  dt(page, "BILL TO", ML, cy, bold, 8, C_MUTED);
+  dt(page, "BOOKING DETAILS", col2X, cy, bold, 8, C_MUTED);
 
-  dt(page, "BILL TO",          ML,     cy, bold, 7.5, C_GOLD);
-  dt(page, "BOOKING DETAILS",  col2X,  cy, bold, 7.5, C_GOLD);
-  cy += 14;
+  cy += 16;
+  let leftY = cy;
+  let rightY = cy;
 
-  dt(page, booking.full_name,          ML,    cy, bold, 11, C_INK);
-  dt(page, cap(booking.event_type),    col2X, cy, bold, 11, C_INK);
-  cy += 15;
-
-  let leftCy  = cy;
-  let rightCy = cy;
-
+  dt(page, booking.full_name, ML, leftY, bold, 12, C_NOIR);
+  leftY += 18;
   if (booking.organisation) {
-    dt(page, booking.organisation, ML, leftCy, reg, 9, C_MUTED);
-    leftCy += 13;
+    dt(page, booking.organisation, ML, leftY, reg, 10, C_MUTED);
+    leftY += 15;
   }
-  dt(page, booking.email, ML, leftCy, reg, 9, C_MUTED);
-  leftCy += 13;
+  dt(page, booking.email, ML, leftY, reg, 10, C_MUTED);
+  leftY += 15;
   if (booking.phone) {
-    dt(page, booking.phone, ML, leftCy, reg, 9, C_MUTED);
-    leftCy += 13;
+    dt(page, booking.phone, ML, leftY, reg, 10, C_MUTED);
+    leftY += 15;
   }
 
-  const dateStr = booking.start_date === booking.end_date
+  dt(page, cap(booking.event_type), col2X, rightY, bold, 12, C_NOIR);
+  rightY += 18;
+
+  const dateStr = fmtDate(booking.start_date) === fmtDate(booking.end_date)
     ? fmtDate(booking.start_date)
     : `${fmtDate(booking.start_date)} to ${fmtDate(booking.end_date)}`;
-  const dateLines = wrap(dateStr, reg, 9, colW);
+
+  const dateLines = wrap(dateStr, reg, 10, colW);
   for (const line of dateLines) {
-    dt(page, line, col2X, rightCy, reg, 9, C_MUTED);
-    rightCy += 13;
+    dt(page, line, col2X, rightY, reg, 10, C_NOIR);
+    rightY += 15;
   }
-  dt(page, `${t5(booking.start_time)} – ${t5(booking.end_time)}`, col2X, rightCy, reg, 9, C_MUTED);
-  rightCy += 13;
-  dt(page, `${booking.participants} participant${booking.participants !== 1 ? "s" : ""}`, col2X, rightCy, reg, 9, C_MUTED);
-  rightCy += 13;
+  dt(page, `${t5(booking.start_time)} – ${t5(booking.end_time)}`, col2X, rightY, reg, 10, C_MUTED);
+  rightY += 15;
+  dt(page, `${booking.participants} participant${booking.participants !== 1 ? "s" : ""}`, col2X, rightY, reg, 10, C_MUTED);
+  rightY += 15;
 
-  cy = Math.max(leftCy, rightCy) + 16;
+  cy = Math.max(leftY, rightY) + 30;
 
-  hl(page, ML, MR, cy);
-  cy += 18;
+  // ── Line Items Table ──────────────────────────────────────────────────────
+  
+  // Table header background
+  dr(page, ML, cy, CW, 26, rgb(0.96, 0.95, 0.93)); // soft beige
+  dt(page, "DESCRIPTION", ML + 12, cy + 8, bold, 9, C_NOIR);
+  dtR(page, "AMOUNT", MR - 12, cy + 8, bold, 9, C_NOIR);
 
-  // ── Line items ──────────────────────────────────────────────────────────────
-  // Header row
-  dr(page, ML, cy, CW, 18, C_NOIR);
-  dt(page,  "DESCRIPTION", ML + 8, cy + 5, bold, 7.5, C_WHITE);
-  dtR(page, "AMOUNT",      MR - 8, cy + 5, bold, 7.5, C_WHITE);
-  cy += 22;
+  cy += 26 + 18; // move past header
 
   const desc = (booking.invoice_breakdown && !["null", "undefined"].includes(String(booking.invoice_breakdown)))
     ? String(booking.invoice_breakdown)
-    : `${cap(booking.event_type)} — ${fmtDate(booking.start_date)}`;
+    : `${cap(booking.event_type)} Booking — ${fmtDate(booking.start_date)}`;
 
-  const descLines = wrap(desc, reg, 9, CW - 140);
+  const descLines = wrap(desc, reg, 10, CW - 150);
   for (const line of descLines) {
-    dt(page, line, ML + 8, cy, reg, 9, C_INK);
-    cy += 13;
+    dt(page, line, ML + 12, cy, reg, 10, C_NOIR);
+    cy += 16;
   }
-  dtR(page, money(subtotal), MR - 8, cy - 13, reg, 9, C_INK);
 
-  if (
-    booking.discount_applied &&
-    !["None", "None (Fallback Calculation)", "null", "undefined"].includes(String(booking.discount_applied))
-  ) {
-    dt(page, `Discount applied: ${booking.discount_applied}`, ML + 8, cy, obl, 8, C_MUTED);
-    cy += 13;
+  // Draw amount aligned with the first line of description
+  dtR(page, money(subtotal), MR - 12, cy - (16 * descLines.length), reg, 10, C_NOIR);
+
+  if (booking.discount_applied && !["None", "None (Fallback Calculation)", "null", "undefined"].includes(String(booking.discount_applied))) {
+    dt(page, `Discount applied: ${booking.discount_applied}`, ML + 12, cy, obl, 9, C_MUTED);
+    cy += 14;
   }
 
   if (booking.extras?.length) {
-    dt(page, `Optional extras: ${booking.extras.join(", ")}`, ML + 8, cy, reg, 8, C_MUTED);
-    cy += 13;
+    dt(page, `Optional extras: ${booking.extras.join(", ")}`, ML + 12, cy, reg, 9, C_MUTED);
+    cy += 14;
   }
 
-  cy += 10;
-  hl(page, ML, MR, cy);
-  cy += 14;
+  cy += 20;
+  hl(page, ML, MR, cy, C_LINE, 1);
+  cy += 20;
 
-  // ── Totals ──────────────────────────────────────────────────────────────────
-  const tLX = MR - 235;
+  // ── Totals ────────────────────────────────────────────────────────────────
+  const tLX = MR - 200;
 
   const totLine = (label: string, value: string, isBold = false) => {
     const f  = isBold ? bold : reg;
-    const sz = isBold ? 11   : 9.5;
-    const cl = isBold ? C_INK : C_MUTED;
-    dt(page,  label, tLX,    cy, f, sz, cl);
-    dtR(page, value, MR - 8, cy, f, sz, cl);
-    cy += isBold ? 22 : 15;
+    const sz = isBold ? 12 : 10;
+    const cl = isBold ? C_NOIR : C_MUTED;
+    dt(page, label, tLX, cy, f, sz, cl);
+    dtR(page, value, MR, cy, f, sz, cl);
+    cy += isBold ? 24 : 20;
   };
 
   totLine("Subtotal (excl. VAT)", money(subtotal));
-  totLine(`VAT (${vatRate}%)`,    money(vat));
-  hl(page, tLX, MR, cy - 4, C_INK, 0.75);
+  totLine(`VAT (${vatRate}%)`, money(vat));
+  hl(page, tLX, MR, cy - 8, C_LINE, 1);
   cy += 4;
-  totLine(kind === "receipt" ? "Amount Paid" : "Total Due", money(total), true);
+  totLine(kind === "receipt" ? "Total Paid" : "Total Due", money(total), true);
 
-  // ── PAID stamp (receipts only) ──────────────────────────────────────────────
+  // ── PAID Stamp ────────────────────────────────────────────────────────────
   if (kind === "receipt") {
-    cy += 8;
-    const stampW = 130, stampH = 44;
-    dr(page, ML, cy, stampW, stampH, C_GREEN_BG, { color: C_GREEN, width: 2.5 });
-    dtC(page, "PAID", ML, stampW, cy + 10, bold, 22, C_GREEN);
+    cy += 15;
+    dr(page, ML, cy, 150, 50, rgb(0.92, 0.98, 0.94), { color: C_GREEN, width: 2 });
+    dtC(page, "PAID IN FULL", ML, 150, cy + 14, bold, 14, C_GREEN);
     if (booking.payment_method) {
-      dt(page, `Via ${booking.payment_method}`, ML + 6, cy + stampH + 8, reg, 7.5, C_MUTED);
+      dtC(page, `Via ${booking.payment_method}`, ML, 150, cy + 32, reg, 9, C_GREEN);
     }
-    cy += stampH + 22;
   }
 
-  // ── Footer ──────────────────────────────────────────────────────────────────
-  const footerH = 76;
+  // ── Footer ────────────────────────────────────────────────────────────────
+  const footerH = 80;
   dr(page, 0, PAGE_H - footerH, PAGE_W, footerH, C_NOIR);
-  hl(page, ML, MR, PAGE_H - footerH + 1, C_GOLD, 0.5);
+  dr(page, 0, PAGE_H - footerH, PAGE_W, 3, C_GOLD); // top accent for footer
 
-  const fY = PAGE_H - footerH + 18;
+  const fY = PAGE_H - footerH + 20;
   if (kind === "invoice") {
-    dt(page, "Payment Instructions", ML, fY, bold, 8.5, C_WHITE);
-    const instrLines = wrap(
-      "Complete payment via the secure link sent to your email to confirm your booking. Your slot is held for 6 hours from the time of booking.",
-      reg, 7.5, CW
-    );
-    let iy = fY + 14;
-    for (const line of instrLines) { dt(page, line, ML, iy, reg, 7.5, C_MUTED); iy += 11; }
-    dt(page, "Bookings are non-refundable once confirmed. All prices are inclusive of VAT.", ML, iy + 3, reg, 7, C_GRAY);
+    dt(page, "Payment Instructions", ML, fY, bold, 9, C_WHITE);
+    dt(page, "Complete payment via the secure link sent to your email to confirm your booking.", ML, fY + 16, reg, 8, rgb(0.8, 0.8, 0.8));
+    dt(page, "Bookings are non-refundable once confirmed. All prices are inclusive of VAT.", ML, fY + 30, reg, 7, rgb(0.5, 0.5, 0.5));
   } else {
-    dt(page, "Thank you — your booking is confirmed!", ML, fY, bold, 9, C_WHITE);
-    dt(page, "For assistance please contact: thecastleacademyspace@gmail.com", ML, fY + 16, reg, 7.5, C_MUTED);
-    dt(page, "All bookings are non-refundable. Prices are inclusive of VAT.", ML, fY + 30, reg, 7, C_GRAY);
+    dt(page, "Thank you — your booking is confirmed!", ML, fY, bold, 10, C_WHITE);
+    dt(page, "For assistance please contact: thecastleacademyspace@gmail.com", ML, fY + 20, reg, 8, rgb(0.8, 0.8, 0.8));
+    dt(page, "All bookings are non-refundable. Prices are inclusive of VAT.", ML, fY + 34, reg, 7, rgb(0.5, 0.5, 0.5));
   }
 
-  dtC(page, `© ${new Date().getFullYear()} ${venueName}`, 0, PAGE_W, PAGE_H - 8, reg, 7, C_MUTED);
+  dtC(page, `© ${new Date().getFullYear()} ${venueName}`, 0, PAGE_W, PAGE_H - 12, reg, 7, rgb(0.4, 0.4, 0.4));
 
   const pdfBytes = await doc.save();
   return Buffer.from(pdfBytes);

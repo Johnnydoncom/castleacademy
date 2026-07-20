@@ -411,6 +411,8 @@ Respond ONLY with valid JSON matching this schema exactly:
                 invoice_breakdown: invoiceBreakdown,
                 status: "pending",
                 payment_status: "unpaid",
+                invoice_number: null,
+                payment_method: null,
               };
               const pdf = await generateBookingPdf(invoiceBooking, "invoice");
               invoiceAttachment = [{ filename: `Invoice-${reference}.pdf`, content: pdf }];

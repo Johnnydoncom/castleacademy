@@ -62,38 +62,52 @@ const C_GRAY  = rgb(0.400, 0.400, 0.400);
 /** Convert from-top Y to pdf-lib from-bottom Y. */
 const py = (fromTop: number) => PAGE_H - fromTop;
 
+/** Strip non-WinAnsi characters to prevent pdf-lib encoding crashes. */
+function cln(text: string | null | undefined | number): string {
+  if (text == null) return "";
+  return String(text)
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/[\u201C\u201D]/g, '"')
+    .replace(/[\u2013\u2014]/g, "-")
+    .replace(/₦/g, "NGN")
+    .replace(/[^\x20-\x7E\xA0-\xFF]/g, "");
+}
+
 /** Draw text at a from-top Y position. */
 function dt(
   page: PDFPage,
-  content: string,
+  content: string | number,
   x: number,
   topY: number,
   font: PDFFont,
   size: number,
   color: RGB,
 ): void {
-  if (!content) return;
-  page.drawText(String(content), { x, y: py(topY), font, size, color });
+  const safe = cln(content);
+  if (!safe) return;
+  page.drawText(safe, { x, y: py(topY), font, size, color });
 }
 
 /** Draw right-aligned text. */
 function dtR(
   page: PDFPage,
-  content: string,
+  content: string | number,
   rightX: number,
   topY: number,
   font: PDFFont,
   size: number,
   color: RGB,
 ): void {
-  const w = font.widthOfTextAtSize(String(content), size);
-  dt(page, content, rightX - w, topY, font, size, color);
+  const safe = cln(content);
+  if (!safe) return;
+  const w = font.widthOfTextAtSize(safe, size);
+  dt(page, safe, rightX - w, topY, font, size, color);
 }
 
 /** Draw centered text within [x, x+width]. */
 function dtC(
   page: PDFPage,
-  content: string,
+  content: string | number,
   x: number,
   width: number,
   topY: number,
@@ -101,8 +115,10 @@ function dtC(
   size: number,
   color: RGB,
 ): void {
-  const w = font.widthOfTextAtSize(String(content), size);
-  dt(page, content, x + (width - w) / 2, topY, font, size, color);
+  const safe = cln(content);
+  if (!safe) return;
+  const w = font.widthOfTextAtSize(safe, size);
+  dt(page, safe, x + (width - w) / 2, topY, font, size, color);
 }
 
 /** Draw a filled rectangle using from-top coordinates. */
@@ -140,8 +156,9 @@ function hl(
 // ── Text utilities ─────────────────────────────────────────────────────────────
 
 function wrap(text: string, font: PDFFont, size: number, maxWidth: number): string[] {
-  if (!text) return [""];
-  const words = String(text).split(" ");
+  const safe = cln(text);
+  if (!safe) return [""];
+  const words = safe.split(" ");
   const lines: string[] = [];
   let cur = "";
   for (const word of words) {
@@ -154,7 +171,7 @@ function wrap(text: string, font: PDFFont, size: number, maxWidth: number): stri
     }
   }
   if (cur) lines.push(cur);
-  return lines.length ? lines : [text];
+  return lines.length ? lines : [safe];
 }
 
 /** NGN prefix instead of ₦ — standard PDF fonts are Latin-only. */

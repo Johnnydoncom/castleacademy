@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
-import { sql } from "@/lib/db";
+import { sql, friendlyDbError } from "@/lib/db";
 import bcrypt from "bcryptjs";
 import { buildCustomerCookie, normalizeEmail } from "@/lib/customer-auth";
+
+export const runtime = "nodejs";
 
 /**
  * POST /api/customer/register
@@ -40,17 +42,26 @@ export async function POST(req: Request) {
     `;
     const customerId = inserted[0].id as string;
 
-    // Link prior guest bookings made with this email
-    await sql`
-      UPDATE bookings SET customer_id = ${customerId}::uuid
-      WHERE customer_id IS NULL AND LOWER(email) = ${email}
-    `;
+    // Link prior guest bookings made with this email.
+    // Wrapped separately so a schema hiccup here never fails account creation.
+    try {
+      await sql`
+        UPDATE bookings SET customer_id = ${customerId}::uuid
+        WHERE customer_id IS NULL AND LOWER(email) = ${email}
+      `;
+    } catch (linkErr) {
+      console.error("[customer/register] guest-booking link skipped:", linkErr);
+    }
 
     const res = NextResponse.json({ success: true });
     res.headers.append("Set-Cookie", buildCustomerCookie(customerId));
     return res;
   } catch (err) {
     console.error("[customer/register] error:", err);
-    return NextResponse.json({ error: "Failed to create account." }, { status: 500 });
+    const friendly = friendlyDbError(err);
+    return NextResponse.json(
+      { error: friendly || "Failed to create account. Please try again." },
+      { status: friendly ? 400 : 500 }
+    );
   }
 }

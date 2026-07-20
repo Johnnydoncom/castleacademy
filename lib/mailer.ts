@@ -97,6 +97,28 @@ export async function resendReceiptEmail(booking: InvoiceBooking): Promise<boole
   return true;
 }
 
+/** Send a password-reset link to a customer. */
+export async function sendPasswordResetEmail(email: string, name: string, link: string): Promise<boolean> {
+  const t = createTransporter();
+  if (!t) return false;
+  const firstName = (name || "there").split(" ")[0];
+  const html = shell(`<tr><td style='padding:28px 32px;'>
+<h2 style='margin:0 0 8px;color:#0d0d0d;font-size:19px;'>Hi ${firstName}, reset your password</h2>
+<p style='margin:0 0 18px;color:#444;font-size:14px;line-height:1.6;'>We received a request to reset the password for your ${VENUE_NAME} account. Click the button below to choose a new password. This link expires in 1 hour.</p>
+<a href='${link}' style='display:inline-block;background:#c9a84c;color:#0d0d0d;padding:12px 28px;border-radius:50px;font-size:14px;font-weight:700;text-decoration:none;'>Reset my password →</a>
+<p style='margin:18px 0 0;color:#777;font-size:12px;line-height:1.6;'>If you didn't request this, you can safely ignore this email — your password won't change. If the button doesn't work, paste this link into your browser:<br><span style='color:#555;word-break:break-all;'>${link}</span></p>
+</td></tr>`);
+  await t.sendMail({
+    from: `"${VENUE_NAME}" <${process.env.SMTP_EMAIL}>`,
+    to: email,
+    replyTo: NOTIFICATION_EMAIL,
+    subject: `Reset your ${VENUE_NAME} password`,
+    text: stripHtml(html) + `\n\nReset link: ${link}`,
+    html,
+  });
+  return true;
+}
+
 /** Notify the admin that a customer requested a reschedule. */
 export async function notifyAdminReschedule(
   booking: InvoiceBooking,

@@ -9,11 +9,21 @@ role-based admin access, and several booking-robustness features.
 # 1. Install the new PDF dependency (pdfkit)
 npm install
 
-# 2. Apply the database migration (adds roles, customers, reschedule fields)
+# 2. Apply BOTH database migrations, in order.
+#    005 = roles, customers, reschedule fields, constraint fix
+#    006 = password-reset tokens (required for "forgot password")
 node lib/run_migration_005.mjs
+node lib/run_migration_006.mjs
 #   — or —
 psql $DATABASE_URL -f lib/migrations/005_rbac_customers_reschedule.sql
+psql $DATABASE_URL -f lib/migrations/006_password_resets.sql
 ```
+
+> **If customer signup/login returns an error**, it almost always means the
+> `customers` table doesn't exist yet — i.e. migration **005** hasn't been applied
+> to the database `DATABASE_URL` points at. The auth routes now return a clear
+> "run the latest database migration" message instead of a generic 500 so this is
+> obvious. Run both migrations above and retry.
 
 Optional new env var (falls back to `ADMIN_SECRET` if unset):
 
@@ -60,9 +70,17 @@ APIs enforce it server-side (`lib/auth.ts` → `getAdminSession()` / `isOwner()`
 Mobile-responsive self-service dashboard (email + password auth):
 
 - **Sign up / sign in** — guest bookings made with the same email are auto-linked.
+- **Forgot password** — "Forgot password?" on the sign-in card emails a one-hour
+  reset link (`/reset-password?token=…`). Uses `password_reset_tokens` (migration 006);
+  raw tokens are never stored (only their SHA-256 hash). No account-enumeration: the
+  "forgot" endpoint always returns the same response whether or not the email exists.
 - **My Bookings** — status, payment, totals; download invoice/receipt PDFs; "Pay Now"
   for unpaid bookings; email-me-my-invoice/receipt; request a reschedule.
 - **Profile** — update name/phone and change password.
+
+Auth routes (`register`, `login`, `password/*`) now map known DB errors (missing table,
+stale schema, unreachable DB, duplicate email) to clear, actionable messages via
+`friendlyDbError()` in `lib/db.ts`, instead of an opaque 500.
 
 APIs live under `/api/customer/*`. Session cookie: `customer_session` (separate from admin).
 A "My Account" link was added to the site nav, the booking success panel, and the payment

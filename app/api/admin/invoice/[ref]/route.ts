@@ -21,20 +21,29 @@ export async function GET(req: Request, { params }: { params: Promise<{ ref: str
   const { searchParams } = new URL(req.url);
   let kind = (searchParams.get("type") as DocKind) || "invoice";
 
-  const rows = await sql`SELECT * FROM bookings WHERE reference = ${ref} LIMIT 1`;
-  const booking = rows[0] as unknown as InvoiceBooking | undefined;
-  if (!booking) return NextResponse.json({ error: "Booking not found" }, { status: 404 });
+  try {
+    const rows = await sql`SELECT * FROM bookings WHERE reference = ${ref} LIMIT 1`;
+    const booking = rows[0] as unknown as InvoiceBooking | undefined;
+    if (!booking) return NextResponse.json({ error: "Booking not found" }, { status: 404 });
 
-  if (kind === "receipt" && booking.payment_status !== "paid") kind = "invoice";
+    if (kind === "receipt" && booking.payment_status !== "paid") kind = "invoice";
 
-  const pdf = await generateBookingPdf(booking, kind);
-  const filename = `${kind === "receipt" ? "Receipt" : "Invoice"}-${ref}.pdf`;
+    const pdf = await generateBookingPdf(booking, kind);
+    const filename = `${kind === "receipt" ? "Receipt" : "Invoice"}-${ref}.pdf`;
 
-  return new NextResponse(new Uint8Array(pdf), {
-    headers: {
-      "Content-Type": "application/pdf",
-      "Content-Disposition": `inline; filename="${filename}"`,
-      "Cache-Control": "private, no-store",
-    },
-  });
+    return new NextResponse(new Uint8Array(pdf), {
+      headers: {
+        "Content-Type": "application/pdf",
+        "Content-Disposition": `inline; filename="${filename}"`,
+        "Cache-Control": "private, no-store",
+      },
+    });
+  } catch (err) {
+    console.error(`[admin/invoice/${ref}] PDF generation failed:`, err);
+    return NextResponse.json(
+      { error: "Failed to generate PDF. Please try again or contact support." },
+      { status: 500 }
+    );
+  }
 }
+

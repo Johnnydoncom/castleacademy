@@ -445,7 +445,6 @@ export function BookingsTable() {
                           )}
                         </div>
                       </TableCell>
-
                       {/* Actions */}
                       <TableCell className="text-right">
                         <div className="flex flex-col items-end gap-2">
@@ -530,16 +529,16 @@ export function BookingsTable() {
                           {/* Mark as Paid button — only for unpaid active bookings */}
                           {(b.payment_status === "unpaid" || !b.payment_status) &&
                             !["expired", "cancelled"].includes(b.status) && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="h-7 text-[11px] gap-1 border-gold/50 text-gold hover:bg-gold/10 hover:text-royal-deep font-medium"
-                              onClick={() => markAsPaid(b.id)}
-                            >
-                              <Banknote className="h-3 w-3" />
-                              Mark Paid
-                            </Button>
-                          )}
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-7 text-[11px] gap-1 border-gold/50 text-gold hover:bg-gold/10 hover:text-royal-deep font-medium"
+                                onClick={() => markAsPaid(b.id)}
+                              >
+                                <Banknote className="h-3 w-3" />
+                                Mark Paid
+                              </Button>
+                            )}
 
                           {/* Checkout link — for unpaid active bookings with a checkout link */}
                           {b.checkout_link &&

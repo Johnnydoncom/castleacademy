@@ -450,7 +450,7 @@ export function BookingsTable() {
                       <TableCell className="text-right">
                         <div className="flex flex-col items-end gap-2">
                           {/* Reschedule request — approve / decline */}
-                          {b.reschedule_status === "requested" && (
+                          {b.reschedule_status === "requested" && !["expired", "cancelled"].includes(b.status) && (
                             <div className="w-full max-w-[220px] rounded-lg border border-violet-200 bg-violet-50 p-2 text-left">
                               <p className="flex items-center gap-1 text-[11px] font-semibold text-violet-700">
                                 <CalendarClock className="h-3 w-3" /> Reschedule requested
@@ -506,8 +506,9 @@ export function BookingsTable() {
                           <Select
                             value={b.status}
                             onValueChange={(v) => updateStatus(b.id, v)}
+                            disabled={["expired", "cancelled"].includes(b.status)}
                           >
-                            <SelectTrigger className="w-28 h-8 text-xs inline-flex ml-auto bg-card border-border focus:ring-gold font-medium">
+                            <SelectTrigger className="w-28 h-8 text-xs inline-flex ml-auto bg-card border-border focus:ring-gold font-medium disabled:opacity-50">
                               <SelectValue placeholder="Update" />
                             </SelectTrigger>
                             <SelectContent>
@@ -526,9 +527,9 @@ export function BookingsTable() {
                             </SelectContent>
                           </Select>
 
-                          {/* Mark as Paid button — only for unpaid bookings */}
-                          {(b.payment_status === "unpaid" ||
-                            !b.payment_status) && (
+                          {/* Mark as Paid button — only for unpaid active bookings */}
+                          {(b.payment_status === "unpaid" || !b.payment_status) &&
+                            !["expired", "cancelled"].includes(b.status) && (
                             <Button
                               variant="outline"
                               size="sm"
@@ -540,10 +541,10 @@ export function BookingsTable() {
                             </Button>
                           )}
 
-                          {/* Checkout link — for unpaid bookings with a checkout link */}
+                          {/* Checkout link — for unpaid active bookings with a checkout link */}
                           {b.checkout_link &&
-                            (b.payment_status === "unpaid" ||
-                              !b.payment_status) && (
+                            (b.payment_status === "unpaid" || !b.payment_status) &&
+                            !["expired", "cancelled"].includes(b.status) && (
                               <div className="flex items-center gap-1">
                                 <Tooltip>
                                   <TooltipTrigger asChild>

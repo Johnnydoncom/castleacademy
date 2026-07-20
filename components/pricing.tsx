@@ -30,7 +30,7 @@ export function Pricing() {
                   <span className="font-display text-5xl leading-none text-white md:text-6xl">
                     ₦100,000
                   </span>
-                  <span className="text-sm font-medium text-gold/80">+ VAT</span>
+                  <span className="text-sm font-medium text-gold/80">(exclusive of VAT)</span>
                 </div>
                 <p className="mt-2 text-sm text-white/70">
                   for up to 3 hours of dedicated venue time
@@ -42,7 +42,7 @@ export function Pricing() {
                       Extra hour
                     </div>
                     <div className="mt-1 font-display text-2xl text-gold">
-                      ₦30,000 <span className="text-sm font-normal text-gold/70">+ VAT</span>
+                      ₦30,000 <span className="text-sm font-normal text-gold/70">(excl. VAT)</span>
                     </div>
                   </div>
                   <div className="text-right">

@@ -45,6 +45,7 @@ import {
 export function BookingsTable() {
   const [bookings, setBookings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
 
@@ -90,6 +91,31 @@ export function BookingsTable() {
       fetchBookings();
     } catch {
       toast.error("Failed to update status");
+    }
+  };
+
+  const downloadPdf = async (ref: string, type: "invoice" | "receipt") => {
+    setBusy(ref + ":" + type);
+    try {
+      const res = await fetch(`/api/admin/invoice/${ref}?type=${type}`);
+      if (!res.ok) {
+        let err = "Failed to generate PDF";
+        try { const d = await res.json(); if (d.error) err = d.error; } catch { /* ignore */ }
+        throw new Error(err);
+      }
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${type === "invoice" ? "Invoice" : "Receipt"}-${ref}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to download PDF");
+    } finally {
+      setBusy(null);
     }
   };
 
@@ -448,23 +474,31 @@ export function BookingsTable() {
 
                           {/* Invoice / receipt PDF */}
                           <div className="flex items-center gap-2">
-                            <a
-                              href={`/api/admin/invoice/${b.reference}?type=invoice`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+                            <button
+                              onClick={() => downloadPdf(b.reference, "invoice")}
+                              disabled={busy === b.reference + ":invoice"}
+                              className="inline-flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
                             >
-                              <FileText className="h-3 w-3" /> Invoice
-                            </a>
+                              {busy === b.reference + ":invoice" ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <FileText className="h-3 w-3" />
+                              )}
+                              Invoice
+                            </button>
                             {b.payment_status === "paid" && (
-                              <a
-                                href={`/api/admin/invoice/${b.reference}?type=receipt`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+                              <button
+                                onClick={() => downloadPdf(b.reference, "receipt")}
+                                disabled={busy === b.reference + ":receipt"}
+                                className="inline-flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
                               >
-                                <FileText className="h-3 w-3" /> Receipt
-                              </a>
+                                {busy === b.reference + ":receipt" ? (
+                                  <Loader2 className="h-3 w-3 animate-spin" />
+                                ) : (
+                                  <FileText className="h-3 w-3" />
+                                )}
+                                Receipt
+                              </button>
                             )}
                           </div>
 

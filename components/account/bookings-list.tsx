@@ -240,6 +240,31 @@ export function BookingsList() {
     } finally { setBusy(null); }
   };
 
+  const downloadPdf = async (ref: string, type: "invoice" | "receipt") => {
+    setBusy(ref + ":" + type);
+    try {
+      const res = await fetch(`/api/customer/invoice/${ref}?type=${type}`);
+      if (!res.ok) {
+        let err = "Failed to generate PDF";
+        try { const d = await res.json(); if (d.error) err = d.error; } catch { /* ignore */ }
+        throw new Error(err);
+      }
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${type === "invoice" ? "Invoice" : "Receipt"}-${ref}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to download PDF");
+    } finally {
+      setBusy(null);
+    }
+  };
+
   // ── Render ────────────────────────────────────────────────────────────────
 
   if (loading) {
@@ -511,28 +536,38 @@ export function BookingsList() {
 
                       {/* Invoice PDF */}
                       {!isCancelled && (
-                        <a
-                          href={`/api/customer/invoice/${b.reference}?type=invoice`}
-                          target="_blank"
-                          rel="noopener noreferrer"
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="rounded-full gap-1.5"
+                          onClick={() => downloadPdf(b.reference, "invoice")}
+                          disabled={busy === b.reference + ":invoice"}
                         >
-                          <Button size="sm" variant="outline" className="rounded-full gap-1.5">
-                            <FileText className="h-3.5 w-3.5" /> Invoice PDF
-                          </Button>
-                        </a>
+                          {busy === b.reference + ":invoice" ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <FileText className="h-3.5 w-3.5" />
+                          )}
+                          Invoice PDF
+                        </Button>
                       )}
 
                       {/* Receipt PDF — paid only */}
                       {isPaid && (
-                        <a
-                          href={`/api/customer/invoice/${b.reference}?type=receipt`}
-                          target="_blank"
-                          rel="noopener noreferrer"
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="rounded-full gap-1.5"
+                          onClick={() => downloadPdf(b.reference, "receipt")}
+                          disabled={busy === b.reference + ":receipt"}
                         >
-                          <Button size="sm" variant="outline" className="rounded-full gap-1.5">
-                            <Download className="h-3.5 w-3.5" /> Receipt PDF
-                          </Button>
-                        </a>
+                          {busy === b.reference + ":receipt" ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Download className="h-3.5 w-3.5" />
+                          )}
+                          Receipt PDF
+                        </Button>
                       )}
 
                       {/* Email me */}

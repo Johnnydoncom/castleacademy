@@ -45,20 +45,10 @@ async function runSweeps() {
   `;
 
   // ── 2. Past-event cleanup ──────────────────────────────────────────────────
-  // A booking's event is "over" when (end_date, end_time) is in the past.
-  // We combine end_date + end_time into a proper timestamp for comparison.
-  const pastCompleted = await sql`
-    UPDATE bookings
-    SET status = 'completed', updated_at = NOW()
-    WHERE status IN ('confirmed')
-      AND payment_status = 'paid'
-      AND (end_date < CURRENT_DATE OR (
-            end_date = CURRENT_DATE AND
-            end_time::time < CURRENT_TIME
-          ))
-    RETURNING reference
-  `;
-
+  // Any pending or confirmed booking whose event end date+time has passed
+  // and was never paid → mark expired.
+  // NOTE: paid+confirmed past bookings intentionally stay 'confirmed';
+  // the DB CHECK constraint only allows: pending | confirmed | cancelled | expired.
   const pastExpired = await sql`
     UPDATE bookings
     SET status = 'expired', updated_at = NOW()
@@ -73,7 +63,6 @@ async function runSweeps() {
 
   return {
     gracePeriodExpired: gracePeriodExpired.map((r) => r.reference),
-    pastCompleted: pastCompleted.map((r) => r.reference),
     pastExpired: pastExpired.map((r) => r.reference),
   };
 }
@@ -87,12 +76,10 @@ export async function GET(req: Request) {
     const result = await runSweeps();
     const totalChanged =
       result.gracePeriodExpired.length +
-      result.pastCompleted.length +
       result.pastExpired.length;
 
     console.log("[cron/expire-pending]", {
       gracePeriodExpired: result.gracePeriodExpired.length,
-      pastCompleted: result.pastCompleted.length,
       pastExpired: result.pastExpired.length,
     });
 

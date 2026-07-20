@@ -25,6 +25,7 @@ export const runtime = "nodejs";
  * Auth: owner admin session  OR  x-cron-secret header.
  */
 
+
 async function authorize(req: Request): Promise<boolean> {
   const secret = process.env.CRON_SECRET || process.env.ADMIN_SECRET;
   const provided = req.headers.get("x-cron-secret");

@@ -32,6 +32,7 @@ export interface InvoiceBooking {
   invoice_breakdown: string | null;
   discount_applied: string | null;
   extras: string[] | null;
+  paid_at?: string | null;
 }
 
 // ── Page constants ─────────────────────────────────────────────────────────────

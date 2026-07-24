@@ -44,7 +44,7 @@ export function Nav() {
             <a
               key={l.href}
               href={l.href}
-              className="relative text-[13px] font-medium uppercase tracking-[0.16em] text-white/70 transition-colors hover:text-gold after:absolute after:-bottom-1.5 after:left-1/2 after:h-px after:w-0 after:bg-gold after:transition-all after:duration-300 hover:after:left-0 hover:after:w-full"
+              className="relative text-[12px] font-medium uppercase tracking-[0.16em] text-white/70 transition-colors hover:text-gold after:absolute after:-bottom-1.5 after:left-1/2 after:h-px after:w-0 after:bg-gold after:transition-all after:duration-300 hover:after:left-0 hover:after:w-full"
             >
               {l.label}
             </a>
@@ -61,7 +61,7 @@ export function Nav() {
             asChild
             className="hidden rounded-none border border-gold bg-transparent px-6 text-[12px] font-medium uppercase tracking-[0.18em] text-gold transition-all hover:bg-gold hover:text-royal-deep md:inline-flex"
           >
-            <a href="#book">Reserve · Book Now</a>
+            <a href="#book">Book Now</a>
           </Button>
           <button
             className="rounded-md border border-white/20 p-2 text-white md:hidden"

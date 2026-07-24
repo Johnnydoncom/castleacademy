@@ -68,11 +68,11 @@ export async function Footer() {
               </a>
             </li>
             <li>
-              <a href="mailto:bookings@castleacademy.ng" className="hover:text-gold transition-colors">
-                bookings@castleacademy.ng
+              <a href="mailto:bookings@thecastleacademy.com" className="hover:text-gold transition-colors">
+                bookings@thecastleacademy.com
               </a>
             </li>
-            <li>Adeniyi Jones, Ikeja, Lagos</li>
+            <li>29b Olorunnimbe Street, Wemabod Estate, Adeniyi Jones, Ikeja, Lagos</li>
           </ul>
 
           {Object.keys(socialLinks).length > 0 && (

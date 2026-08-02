@@ -1,6 +1,8 @@
 import { cookies } from "next/headers";
 import { createHmac, timingSafeEqual } from "crypto";
-import { sql } from "./db";
+import { db } from "./db";
+import { admins } from "./db/schema";
+import { eq } from "drizzle-orm";
 
 const SECRET = process.env.ADMIN_SECRET;
 const COOKIE_NAME = "admin_session";
@@ -88,12 +90,14 @@ export async function getAdminSession(): Promise<AdminSession | null> {
   if (!id) return null;
 
   try {
-    const rows = await sql`
-      SELECT id, username, role FROM admins WHERE id = ${id}::uuid LIMIT 1
-    `;
+    const rows = await db
+      .select({ id: admins.id, username: admins.username, role: admins.role })
+      .from(admins)
+      .where(eq(admins.id, Number(id)))
+      .limit(1);
     if (rows.length === 0) return null;
-    const r = rows[0] as { id: string; username: string; role: string };
-    return { id: r.id, username: r.username, role: (r.role === "owner" ? "owner" : "admin") };
+    const r = rows[0];
+    return { id: String(r.id), username: r.username, role: (r.role === "owner" ? "owner" : "admin") };
   } catch {
     return null;
   }

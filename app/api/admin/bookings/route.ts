@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
-import { sql } from "@/lib/db";
+import { db } from "@/lib/db";
+import { bookings } from "@/lib/db/schema";
+import { eq, sql, and, like } from "drizzle-orm";
 import { cookies } from "next/headers";
 
 async function checkAuth() {
@@ -30,38 +32,79 @@ export async function GET(req: Request) {
     const refFilter = searchParams.get("reference");
     const dateFilter = searchParams.get("date");
 
-    const isStatusAll = !statusFilter || statusFilter === "all";
-    const isPaymentAll = !paymentStatusFilter || paymentStatusFilter === "all";
-    const refParam = refFilter ? `%${refFilter}%` : null;
+    // Build dynamic WHERE conditions
+    const conditions = [];
+    if (statusFilter && statusFilter !== "all") {
+      conditions.push(eq(bookings.status, statusFilter));
+    }
+    if (paymentStatusFilter && paymentStatusFilter !== "all") {
+      conditions.push(eq(bookings.paymentStatus, paymentStatusFilter));
+    }
+    if (refFilter) {
+      conditions.push(like(bookings.reference, `%${refFilter}%`));
+    }
+    if (dateFilter) {
+      conditions.push(eq(bookings.startDate, dateFilter as any));
+    }
 
-    const rows = await sql`
-      SELECT id, reference, full_name, organisation, email, phone,
-             event_type, start_date::text, end_date::text,
-             start_time::text, end_time::text, participants,
-             status, payment_status, payment_method, invoice_total,
-             invoice_subtotal, invoice_vat, discount_applied, invoice_number,
-             agreed_to_policy, nomba_order_ref, nomba_transaction_id,
-             checkout_link, paid_at,
-             reschedule_status, reschedule_date::text, reschedule_start_time::text,
-             reschedule_end_time::text, reschedule_reason,
-             created_at, updated_at, notes
-      FROM bookings
-      WHERE (${isStatusAll} OR status = ${statusFilter})
-        AND (${isPaymentAll} OR payment_status = ${paymentStatusFilter})
-        AND (${!refFilter} OR reference ILIKE ${refParam})
-        AND (${!dateFilter} OR start_date = ${dateFilter}::date)
-      ORDER BY created_at DESC
-      LIMIT ${pageSize} OFFSET ${offset}
-    `;
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
-    const countRows = await sql`
-      SELECT COUNT(*)::int AS total 
-      FROM bookings 
-      WHERE (${isStatusAll} OR status = ${statusFilter})
-        AND (${isPaymentAll} OR payment_status = ${paymentStatusFilter})
-        AND (${!refFilter} OR reference ILIKE ${refParam})
-        AND (${!dateFilter} OR start_date = ${dateFilter}::date)
-    `;
+    // Use db.execute with sql for the JSON_ARRAYAGG subquery since Drizzle
+    // doesn't have a native builder for correlated subqueries with JSON aggregation.
+    const rows = await db
+      .select({
+        id: bookings.id,
+        reference: bookings.reference,
+        full_name: bookings.fullName,
+        organisation: bookings.organisation,
+        email: bookings.email,
+        phone: bookings.phone,
+        event_type: bookings.eventType,
+        start_date: bookings.startDate,
+        end_date: bookings.endDate,
+        start_time: bookings.startTime,
+        end_time: bookings.endTime,
+        participants: bookings.participants,
+        status: bookings.status,
+        payment_status: bookings.paymentStatus,
+        payment_method: bookings.paymentMethod,
+        invoice_total: bookings.invoiceTotal,
+        invoice_subtotal: bookings.invoiceSubtotal,
+        invoice_vat: bookings.invoiceVat,
+        discount_applied: bookings.discountApplied,
+        invoice_number: bookings.invoiceNumber,
+        agreed_to_policy: bookings.agreedToPolicy,
+        nomba_order_ref: bookings.nombaOrderRef,
+        nomba_transaction_id: bookings.nombaTransactionId,
+        checkout_link: bookings.checkoutLink,
+        paid_at: bookings.paidAt,
+        reschedule_status: bookings.rescheduleStatus,
+        reschedule_date: bookings.rescheduleDate,
+        reschedule_start_time: bookings.rescheduleStartTime,
+        reschedule_end_time: bookings.rescheduleEndTime,
+        reschedule_reason: bookings.rescheduleReason,
+        days: sql`(SELECT JSON_ARRAYAGG(
+                    JSON_OBJECT(
+                      'date', DATE_FORMAT(bd.day_date, '%Y-%m-%d'),
+                      'startTime', TIME_FORMAT(bd.start_time, '%H:%i'),
+                      'endTime', TIME_FORMAT(bd.end_time, '%H:%i')
+                    ) ORDER BY bd.day_date
+                  )
+                  FROM booking_days bd WHERE bd.booking_id = ${bookings.id})`,
+        created_at: bookings.createdAt,
+        updated_at: bookings.updatedAt,
+        notes: bookings.notes,
+      })
+      .from(bookings)
+      .where(whereClause)
+      .orderBy(sql`${bookings.createdAt} DESC`)
+      .limit(pageSize)
+      .offset(offset);
+
+    const countRows = await db
+      .select({ total: sql<number>`CAST(COUNT(*) AS UNSIGNED)` })
+      .from(bookings)
+      .where(whereClause);
 
     return NextResponse.json({
       bookings: rows,
@@ -98,46 +141,52 @@ export async function PATCH(req: Request) {
 
     // ── Reschedule approval: apply requested slot to the booking ──────────
     if (action === "approve_reschedule") {
-      const rows = await sql`
-        SELECT reschedule_date::text AS d, reschedule_start_time::text AS s, reschedule_end_time::text AS e
-        FROM bookings WHERE id = ${id}::uuid LIMIT 1
-      `;
+      const rows = await db
+        .select({
+          d: bookings.rescheduleDate,
+          s: bookings.rescheduleStartTime,
+          e: bookings.rescheduleEndTime,
+        })
+        .from(bookings)
+        .where(eq(bookings.id, Number(id)))
+        .limit(1);
       if (rows.length === 0 || !rows[0].d) {
         return NextResponse.json({ error: "No pending reschedule request" }, { status: 400 });
       }
-      await sql`
-        UPDATE bookings SET
-          start_date        = ${rows[0].d}::date,
-          end_date          = ${rows[0].d}::date,
-          start_time        = ${rows[0].s}::time,
-          end_time          = ${rows[0].e}::time,
-          reschedule_status = 'approved',
-          updated_at        = NOW()
-        WHERE id = ${id}::uuid
-      `;
+      await db
+        .update(bookings)
+        .set({
+          startDate: rows[0].d,
+          endDate: rows[0].d,
+          startTime: rows[0].s!,
+          endTime: rows[0].e!,
+          rescheduleStatus: "approved",
+          updatedAt: sql`NOW()`,
+        })
+        .where(eq(bookings.id, Number(id)));
       return NextResponse.json({ success: true, message: "Reschedule approved and applied" });
     }
 
     if (action === "reject_reschedule") {
-      await sql`
-        UPDATE bookings SET reschedule_status = 'rejected', updated_at = NOW()
-        WHERE id = ${id}::uuid
-      `;
+      await db
+        .update(bookings)
+        .set({ rescheduleStatus: "rejected", updatedAt: sql`NOW()` })
+        .where(eq(bookings.id, Number(id)));
       return NextResponse.json({ success: true, message: "Reschedule request declined" });
     }
 
     // Handle "mark as paid" action for offline/manual payments
     if (action === "mark_paid") {
-      await sql`
-        UPDATE bookings
-        SET
-          status         = 'confirmed',
-          payment_status = 'paid',
-          payment_method = 'manual',
-          paid_at        = NOW(),
-          updated_at     = NOW()
-        WHERE id = ${id}::uuid
-      `;
+      await db
+        .update(bookings)
+        .set({
+          status: "confirmed",
+          paymentStatus: "paid",
+          paymentMethod: "manual",
+          paidAt: sql`NOW()`,
+          updatedAt: sql`NOW()`,
+        })
+        .where(eq(bookings.id, Number(id)));
       return NextResponse.json({ success: true, message: "Booking marked as paid and confirmed" });
     }
 
@@ -146,14 +195,14 @@ export async function PATCH(req: Request) {
       return NextResponse.json({ error: "Invalid status value" }, { status: 400 });
     }
 
-    await sql`
-      UPDATE bookings
-      SET
-        status     = COALESCE(${status ?? null}, status),
-        notes      = COALESCE(${notes ?? null}, notes),
-        updated_at = NOW()
-      WHERE id = ${id}::uuid
-    `;
+    const updates: Record<string, any> = { updatedAt: sql`NOW()` };
+    if (status) updates.status = status;
+    if (notes !== undefined) updates.notes = notes;
+
+    await db
+      .update(bookings)
+      .set(updates)
+      .where(eq(bookings.id, Number(id)));
 
     return NextResponse.json({ success: true });
   } catch (err) {

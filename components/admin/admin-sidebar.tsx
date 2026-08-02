@@ -13,6 +13,7 @@ import {
   Menu,
   X,
   ChevronRight,
+  Tag,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -20,6 +21,7 @@ const navItems = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard, ownerOnly: false },
   { href: "/admin/bookings", label: "Bookings", icon: CalendarCheck, ownerOnly: false },
   { href: "/admin/blocked-slots", label: "Blocked Slots", icon: BanIcon, ownerOnly: false },
+  { href: "/admin/pricing", label: "Pricing", icon: Tag, ownerOnly: true },
   { href: "/admin/settings", label: "Venue Settings", icon: Settings, ownerOnly: true },
   { href: "/admin/admins", label: "Admin Accounts", icon: Users, ownerOnly: true },
 ];

@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
-import { sql } from "@/lib/db";
+import { db } from "@/lib/db";
+import { bookings, bookingDays } from "@/lib/db/schema";
+import { eq, and, or, sql, desc } from "drizzle-orm";
 import { getCustomerSession } from "@/lib/customer-auth";
 
 /**
@@ -13,32 +15,65 @@ export async function GET() {
 
   try {
     // Auto-expire unpaid pending bookings that are past the 6-hour grace period.
-    // This runs on every dashboard load so customers always see accurate statuses
-    // even if the external cron has not been called recently.
-    await sql`
-      UPDATE bookings
-      SET status = 'expired', updated_at = NOW()
-      WHERE status = 'pending'
-        AND payment_status = 'unpaid'
-        AND created_at < NOW() - INTERVAL '6 hours'
-        AND (customer_id = ${session.id}::uuid OR LOWER(email) = ${session.email})
-    `.catch((e) => console.error("[customer/bookings] auto-expire failed:", e));
+    await db
+      .update(bookings)
+      .set({ status: "expired", updatedAt: sql`NOW()` })
+      .where(
+        and(
+          eq(bookings.status, "pending"),
+          eq(bookings.paymentStatus, "unpaid"),
+          sql`${bookings.createdAt} < DATE_SUB(NOW(), INTERVAL 6 HOUR)`,
+          sql`(${bookings.customerId} = ${session.id} OR LOWER(${bookings.email}) = ${session.email})`
+        )
+      )
+      .catch((e: Error) => console.error("[customer/bookings] auto-expire failed:", e));
 
-    const rows = await sql`
-      SELECT
-        reference, invoice_number, full_name, organisation, email, phone,
-        event_type, start_date::text, end_date::text,
-        start_time::text, end_time::text, participants, extras,
-        status, payment_status, payment_method,
-        invoice_subtotal, invoice_vat, invoice_total, discount_applied, invoice_breakdown,
-        checkout_link, paid_at, created_at,
-        reschedule_status, reschedule_date::text, reschedule_start_time::text,
-        reschedule_end_time::text, reschedule_reason
-      FROM bookings
-      WHERE customer_id = ${session.id}::uuid
-         OR LOWER(email) = ${session.email}
-      ORDER BY start_date DESC, start_time DESC
-    `;
+    const rows = await db
+      .select({
+        reference: bookings.reference,
+        invoice_number: bookings.invoiceNumber,
+        full_name: bookings.fullName,
+        organisation: bookings.organisation,
+        email: bookings.email,
+        phone: bookings.phone,
+        event_type: bookings.eventType,
+        start_date: bookings.startDate,
+        end_date: bookings.endDate,
+        start_time: bookings.startTime,
+        end_time: bookings.endTime,
+        participants: bookings.participants,
+        extras: bookings.extras,
+        status: bookings.status,
+        payment_status: bookings.paymentStatus,
+        payment_method: bookings.paymentMethod,
+        invoice_subtotal: bookings.invoiceSubtotal,
+        invoice_vat: bookings.invoiceVat,
+        invoice_total: bookings.invoiceTotal,
+        discount_applied: bookings.discountApplied,
+        invoice_breakdown: bookings.invoiceBreakdown,
+        checkout_link: bookings.checkoutLink,
+        paid_at: bookings.paidAt,
+        created_at: bookings.createdAt,
+        reschedule_status: bookings.rescheduleStatus,
+        reschedule_date: bookings.rescheduleDate,
+        reschedule_start_time: bookings.rescheduleStartTime,
+        reschedule_end_time: bookings.rescheduleEndTime,
+        reschedule_reason: bookings.rescheduleReason,
+        // Real per-day schedule via correlated subquery (JSON_ARRAYAGG)
+        days: sql`(SELECT JSON_ARRAYAGG(
+                    JSON_OBJECT(
+                      'date', DATE_FORMAT(bd.day_date, '%Y-%m-%d'),
+                      'startTime', TIME_FORMAT(bd.start_time, '%H:%i'),
+                      'endTime', TIME_FORMAT(bd.end_time, '%H:%i')
+                    ) ORDER BY bd.day_date
+                  )
+                  FROM booking_days bd WHERE bd.booking_id = ${bookings.id})`,
+      })
+      .from(bookings)
+      .where(
+        sql`${bookings.customerId} = ${session.id} OR LOWER(${bookings.email}) = ${session.email}`
+      )
+      .orderBy(sql`${bookings.startDate} DESC, ${bookings.startTime} DESC`);
 
     return NextResponse.json({ bookings: rows });
   } catch (err) {

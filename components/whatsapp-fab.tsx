@@ -19,7 +19,10 @@ export function WhatsAppFAB() {
       target="_blank"
       rel="noopener noreferrer"
       aria-label="Chat with us on WhatsApp"
-      className="group fixed bottom-6 right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-[#25D366] text-white shadow-[0_8px_30px_rgb(0,0,0,0.12)] transition-transform hover:scale-110 active:scale-95 sm:bottom-8 sm:right-8"
+      // `--sticky-bar-h` is published by any bottom-pinned bar that would
+      // otherwise sit under this button (see components/booking-form/quote-bar).
+      // It defaults to 0px, so pages without one are unaffected.
+      className="group fixed bottom-[calc(1.5rem+var(--sticky-bar-h,0px))] right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-[#25D366] text-white shadow-[0_8px_30px_rgb(0,0,0,0.12)] transition-[transform,bottom] hover:scale-110 active:scale-95 sm:bottom-[calc(2rem+var(--sticky-bar-h,0px))] sm:right-8"
     >
       <div className="absolute inset-0 animate-wa-pulse rounded-full border-2 border-[#25D366] opacity-0" />
       <svg

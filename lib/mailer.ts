@@ -5,6 +5,7 @@
  */
 import nodemailer from "nodemailer";
 import { generateBookingPdf, type InvoiceBooking } from "./invoice";
+import { CANCELLATION_HTML } from "./policy";
 
 const VENUE_NAME = process.env.VENUE_NAME || "Castle Academy";
 const NOTIFICATION_EMAIL = process.env.NOTIFICATION_EMAIL || "thecastleacademyspace@gmail.com";
@@ -60,7 +61,7 @@ export async function resendInvoiceEmail(booking: InvoiceBooking): Promise<boole
 <h2 style='margin:0 0 8px;color:#0d0d0d;font-size:19px;'>Hi ${firstName}, here's your invoice again</h2>
 <p style='margin:0 0 16px;color:#444;font-size:14px;line-height:1.6;'>Booking <strong>${booking.reference}</strong> — amount due <strong>${naira(booking.invoice_total)}</strong> (inc. VAT). Your invoice is attached as a PDF.</p>
 ${payBlock}
-<p style='margin:16px 0 0;color:#b45309;font-size:12px;font-weight:600;'>⚠️ Once confirmed, bookings cannot be cancelled or refunded.</p>
+${CANCELLATION_HTML}
 </td></tr>`);
 
   await t.sendMail({

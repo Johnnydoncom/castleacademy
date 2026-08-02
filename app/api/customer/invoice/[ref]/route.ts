@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
-import { sql } from "@/lib/db";
+import { db } from "@/lib/db";
+import { bookings, bookingDays } from "@/lib/db/schema";
+import { eq, asc, sql } from "drizzle-orm";
 import { getCustomerSession } from "@/lib/customer-auth";
 import { generateBookingPdf, type InvoiceBooking, type DocKind } from "@/lib/invoice";
 
@@ -23,18 +25,36 @@ export async function GET(req: Request, { params }: { params: Promise<{ ref: str
   let kind = (searchParams.get("type") as DocKind) || "invoice";
 
   try {
-    const rows = await sql`
-      SELECT * FROM bookings
-      WHERE reference = ${ref}
-        AND (customer_id = ${session.id}::uuid OR LOWER(email) = ${session.email})
-      LIMIT 1
-    `;
+    const rows = await db
+      .select()
+      .from(bookings)
+      .where(
+        sql`${bookings.reference} = ${ref} AND (${bookings.customerId} = ${session.id} OR LOWER(${bookings.email}) = ${session.email})`
+      )
+      .limit(1);
+
     const booking = rows[0] as unknown as InvoiceBooking | undefined;
     if (!booking) return NextResponse.json({ error: "Booking not found" }, { status: 404 });
 
     // Only issue a receipt for paid bookings; otherwise fall back to invoice.
     if (kind === "receipt" && booking.payment_status !== "paid") kind = "invoice";
 
+    // Per-day schedule so the document lists each day's real hours.
+    const dayRows = await db
+      .select({
+        date: bookingDays.dayDate,
+        start_time: bookingDays.startTime,
+        end_time: bookingDays.endTime,
+      })
+      .from(bookingDays)
+      .where(eq(bookingDays.bookingId, (booking as any).id))
+      .orderBy(asc(bookingDays.dayDate));
+
+    booking.days = dayRows.map((r: any) => ({
+      date: String(r.date).slice(0, 10),
+      start_time: String(r.start_time).slice(0, 5),
+      end_time: String(r.end_time).slice(0, 5),
+    })) as InvoiceBooking["days"];
     const pdf = await generateBookingPdf(booking, kind);
     const filename = `${kind === "receipt" ? "Receipt" : "Invoice"}-${ref}.pdf`;
 
@@ -53,4 +73,3 @@ export async function GET(req: Request, { params }: { params: Promise<{ ref: str
     );
   }
 }
-

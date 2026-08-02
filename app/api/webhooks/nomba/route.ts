@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
-import { sql } from "@/lib/db";
+import { db } from "@/lib/db";
+import { bookings } from "@/lib/db/schema";
+import { eq, or, sql } from "drizzle-orm";
 import { verifyWebhookSignature, verifyTransaction } from "@/lib/nomba";
 import { generateBookingPdf, type InvoiceBooking } from "@/lib/invoice";
+import { CANCELLATION_HTML } from "@/lib/policy";
 import nodemailer from "nodemailer";
 
 const VENUE_NAME = process.env.VENUE_NAME || "Castle Academy";
@@ -31,29 +34,20 @@ function createMailTransporter() {
 /**
  * POST /api/webhooks/nomba
  * Receives payment_success, payment_failed, and payment_reversed events from Nomba.
- * Verifies the HMAC signature, then verifies the transaction server-side before
- * updating the booking status.
- *
- * ─── Setup Instructions ────────────────────────────────────────────────────
- * Register this URL in Nomba Dashboard → Developer → Webhook Setup:
- *   Production: https://thecastleacademy.com/api/webhooks/nomba
- * Subscribe to: payment_success, payment_failed, payment_reversed events.
- * Copy the signature key into NOMBA_WEBHOOK_SECRET in your environment.
- * ───────────────────────────────────────────────────────────────────────────
  */
 export async function POST(req: Request) {
   try {
     const rawBody = await req.text();
     const payload = JSON.parse(rawBody);
 
-    // 1. Filter out unhandled events (like ping or setup verification) early
+    // 1. Filter out unhandled events
     const HANDLED_EVENTS = ["payment_success", "payment_failed", "payment_reversed"];
     if (!HANDLED_EVENTS.includes(payload.event_type)) {
       console.log(`[webhooks/nomba] Ignoring unhandled event (or ping): ${payload.event_type}`);
       return NextResponse.json({ received: true });
     }
 
-    // 2. Verify HMAC signature for actual payment lifecycle events
+    // 2. Verify HMAC signature
     const nombaSignature = req.headers.get("nomba-signature") || req.headers.get("nomba-sig-value") || "";
     const nombaTimestamp = req.headers.get("nomba-timestamp") || "";
 
@@ -71,21 +65,15 @@ export async function POST(req: Request) {
     const isFailed = payload.event_type === "payment_failed";
     const isReversed = payload.event_type === "payment_reversed";
 
-    // 3. Extract the order reference (our booking reference)
-    // Nomba can include orderReference in different locations depending on payment method
+    // 3. Extract order reference and transaction details
     const orderReference =
       payload.data?.order?.orderReference ||
       payload.data?.transaction?.merchantTxRef ||
       null;
 
-    // Extract transaction ID (used for precise server-side verification)
     const transactionId = payload.data?.transaction?.transactionId || null;
-
-    // Detect payment method from webhook payload
     const paymentMethod =
-      payload.data?.order?.paymentMethod === "bank_transfer"
-        ? "bank_transfer"
-        : "card";
+      payload.data?.order?.paymentMethod === "bank_transfer" ? "bank_transfer" : "card";
 
     if (!orderReference) {
       console.error("[webhooks/nomba] No orderReference in payload", JSON.stringify(payload));
@@ -94,28 +82,67 @@ export async function POST(req: Request) {
 
     console.log(`[webhooks/nomba] ${payload.event_type} for orderRef: ${orderReference}, txId: ${transactionId}`);
 
-    // 4. Look up the booking by nomba_order_ref (primary lookup)
-    let rows = await sql`
-      SELECT id, reference, email, full_name, organisation, event_type, participants,
-             start_date::text, end_date::text, start_time::text, end_time::text,
-             status, payment_status, payment_method, invoice_subtotal, invoice_vat,
-             invoice_total, discount_applied, invoice_breakdown, invoice_number, paid_at
-      FROM bookings
-      WHERE nomba_order_ref = ${orderReference}
-      LIMIT 1
-    `;
+    // 4. Look up booking by nomba_order_ref, fallback to reference
+    let rows = await db
+      .select({
+        id: bookings.id,
+        reference: bookings.reference,
+        email: bookings.email,
+        full_name: bookings.fullName,
+        organisation: bookings.organisation,
+        event_type: bookings.eventType,
+        participants: bookings.participants,
+        start_date: bookings.startDate,
+        end_date: bookings.endDate,
+        start_time: bookings.startTime,
+        end_time: bookings.endTime,
+        status: bookings.status,
+        payment_status: bookings.paymentStatus,
+        payment_method: bookings.paymentMethod,
+        invoice_subtotal: bookings.invoiceSubtotal,
+        invoice_vat: bookings.invoiceVat,
+        invoice_total: bookings.invoiceTotal,
+        discount_applied: bookings.discountApplied,
+        invoice_breakdown: bookings.invoiceBreakdown,
+        invoice_number: bookings.invoiceNumber,
+        extras: bookings.extras,
+        phone: bookings.phone,
+        paid_at: bookings.paidAt,
+      })
+      .from(bookings)
+      .where(eq(bookings.nombaOrderRef, orderReference))
+      .limit(1);
 
-    // Fallback: match by booking reference directly (orderReference === CA-YYYYMMDD-XXXXXX)
     if (rows.length === 0) {
-      rows = await sql`
-        SELECT id, reference, email, full_name, organisation, event_type, participants,
-               start_date::text, end_date::text, start_time::text, end_time::text,
-               status, payment_status, payment_method, invoice_subtotal, invoice_vat,
-               invoice_total, discount_applied, invoice_breakdown, invoice_number, paid_at
-        FROM bookings
-        WHERE reference = ${orderReference}
-        LIMIT 1
-      `;
+      rows = await db
+        .select({
+          id: bookings.id,
+          reference: bookings.reference,
+          email: bookings.email,
+          full_name: bookings.fullName,
+          organisation: bookings.organisation,
+          event_type: bookings.eventType,
+          participants: bookings.participants,
+          start_date: bookings.startDate,
+          end_date: bookings.endDate,
+          start_time: bookings.startTime,
+          end_time: bookings.endTime,
+          status: bookings.status,
+          payment_status: bookings.paymentStatus,
+          payment_method: bookings.paymentMethod,
+          invoice_subtotal: bookings.invoiceSubtotal,
+          invoice_vat: bookings.invoiceVat,
+          invoice_total: bookings.invoiceTotal,
+          discount_applied: bookings.discountApplied,
+          invoice_breakdown: bookings.invoiceBreakdown,
+          invoice_number: bookings.invoiceNumber,
+          extras: bookings.extras,
+          phone: bookings.phone,
+          paid_at: bookings.paidAt,
+        })
+        .from(bookings)
+        .where(eq(bookings.reference, orderReference))
+        .limit(1);
     }
 
     if (rows.length === 0) {
@@ -125,35 +152,35 @@ export async function POST(req: Request) {
 
     const booking = rows[0];
 
-    // 5. Idempotency guard — skip if already confirmed/paid (only for success events)
+    // 5. Idempotency guard
     if (isSuccess && booking.payment_status === "paid" && booking.status === "confirmed") {
       console.log(`[webhooks/nomba] Booking ${booking.reference} already confirmed — ignoring duplicate`);
       return NextResponse.json({ received: true, message: "Already confirmed" });
     }
 
-    // ── Handle payment_failed / payment_reversed ─────────────────────────────
+    // ── Handle payment_failed / payment_reversed ──────────────────────────────
     if (isFailed || isReversed) {
       const newPaymentStatus = isReversed ? "reversed" : "failed";
-      const newStatus = "pending"; // revert to pending so admin can follow up
 
-      await sql`
-        UPDATE bookings SET
-          status               = ${newStatus},
-          payment_status       = ${newPaymentStatus},
-          nomba_transaction_id = ${transactionId},
-          updated_at           = NOW()
-        WHERE id = ${booking.id}::uuid
-      `;
+      await db
+        .update(bookings)
+        .set({
+          status: "pending",
+          paymentStatus: newPaymentStatus,
+          nombaTransactionId: transactionId,
+          updatedAt: sql`NOW()`,
+        })
+        .where(eq(bookings.id, booking.id));
 
       console.log(`[webhooks/nomba] ⚠️ Booking ${booking.reference} payment ${newPaymentStatus}`);
 
-      // Notify admin so they can follow up with the customer
+      // Notify admin and customer
       const transporter = createMailTransporter();
       if (transporter) {
         const year = new Date().getFullYear();
         const dateLabel =
-          booking.start_date === booking.end_date
-            ? booking.start_date
+          String(booking.start_date) === String(booking.end_date)
+            ? String(booking.start_date)
             : `${booking.start_date} → ${booking.end_date}`;
         const eventLabel = isReversed ? "Payment Reversed" : "Payment Failed";
         const eventEmoji = isReversed ? "↩️" : "❌";
@@ -197,8 +224,8 @@ ${transactionId ? `<tr><td style='padding:5px 0;font-size:13px;color:#888;'>Nomb
           console.error("[webhooks/nomba] Failed to send admin failure email:", emailErr);
         }
 
-        // Also notify the customer so they can retry
-        const firstName = (booking.full_name || "there").split(" ")[0];
+        // Notify customer
+        const firstName = (String(booking.full_name) || "there").split(" ")[0];
         const customerRetryMsg = isReversed
           ? `Your payment for booking <strong>${booking.reference}</strong> has been reversed. Please contact your bank or try a different payment method.`
           : `Unfortunately, your payment for booking <strong>${booking.reference}</strong> was not successful. Please try again using a different card or bank transfer.`;
@@ -228,7 +255,7 @@ ${transactionId ? `<tr><td style='padding:5px 0;font-size:13px;color:#888;'>Nomb
         try {
           await transporter.sendMail({
             from: `"${VENUE_NAME}" <${process.env.SMTP_EMAIL}>`,
-            to: booking.email,
+            to: booking.email as string,
             replyTo: NOTIFICATION_EMAIL,
             subject: `${eventEmoji} Payment ${isReversed ? "Reversed" : "Failed"} — ${VENUE_NAME} · Ref: ${booking.reference}`,
             text: stripHtml(customerFailHtml),
@@ -242,15 +269,11 @@ ${transactionId ? `<tr><td style='padding:5px 0;font-size:13px;color:#888;'>Nomb
       return NextResponse.json({ received: true, updated: newPaymentStatus });
     }
 
-    // ── Handle payment_success ───────────────────────────────────────────────
-    // 6. Server-side transaction verification.
-    // On sandbox, verification endpoints are unreliable — we trust the signed webhook.
-    // On production with NOMBA_WEBHOOK_SECRET set, the HMAC already proves authenticity.
+    // ── Handle payment_success ────────────────────────────────────────────────
     const isSandbox = (process.env.NOMBA_BASE_URL || "").includes("sandbox");
     let verifiedPaymentMethod = paymentMethod;
 
     if (!isSandbox) {
-      // Production: do a hard verify
       const verification = await verifyTransaction(orderReference, transactionId || undefined);
       if (!verification.success) {
         console.warn(`[webhooks/nomba] Transaction verification failed for ${orderReference}:`, verification.statusCode);
@@ -259,9 +282,7 @@ ${transactionId ? `<tr><td style='padding:5px 0;font-size:13px;color:#888;'>Nomb
       verifiedPaymentMethod = verification.paymentMethod || paymentMethod;
       console.log(`[webhooks/nomba] ✅ Server-side verification passed for ${orderReference}`);
     } else {
-      // Sandbox: skip hard verify — trust the webhook payload (already HMAC-verified above)
       console.log(`[webhooks/nomba] ℹ️ Sandbox mode — skipping server-side transaction verification`);
-      // Attempt soft-verify but don't abort on failure
       try {
         const verification = await verifyTransaction(orderReference, transactionId || undefined);
         if (verification.paymentMethod) verifiedPaymentMethod = verification.paymentMethod;
@@ -272,33 +293,34 @@ ${transactionId ? `<tr><td style='padding:5px 0;font-size:13px;color:#888;'>Nomb
     }
 
     // 7. Auto-confirm the booking
-    await sql`
-      UPDATE bookings SET
-        status               = 'confirmed',
-        payment_status       = 'paid',
-        payment_method       = ${verifiedPaymentMethod},
-        nomba_transaction_id = ${transactionId},
-        paid_at              = NOW(),
-        updated_at           = NOW()
-      WHERE id = ${booking.id}::uuid
-    `;
+    await db
+      .update(bookings)
+      .set({
+        status: "confirmed",
+        paymentStatus: "paid",
+        paymentMethod: verifiedPaymentMethod,
+        nombaTransactionId: transactionId,
+        paidAt: sql`NOW()`,
+        updatedAt: sql`NOW()`,
+      })
+      .where(eq(bookings.id, booking.id));
 
     console.log(`[webhooks/nomba] ✅ Booking ${booking.reference} auto-confirmed (${verifiedPaymentMethod})`);
 
-    // 8. Send emails (customer confirmation + admin notification)
+    // 8. Send confirmation emails
     const transporter = createMailTransporter();
     if (transporter) {
-      const firstName = (booking.full_name || "there").split(" ")[0];
+      const firstName = (String(booking.full_name) || "there").split(" ")[0];
       const year = new Date().getFullYear();
       const dateLabel =
-        booking.start_date === booking.end_date
-          ? booking.start_date
+        String(booking.start_date) === String(booking.end_date)
+          ? String(booking.start_date)
           : `${booking.start_date} → ${booking.end_date}`;
       const amountStr = booking.invoice_total
         ? `₦${Number(booking.invoice_total).toLocaleString()}`
         : null;
 
-      // ── Customer Confirmation Email ──────────────────────────────────────
+      // ── Customer Confirmation Email ───────────────────────────────────────
       const customerHtml = `<!DOCTYPE html><html lang='en'><head><meta charset='UTF-8'></head>
 <body style='margin:0;padding:0;background:#f5f3ee;font-family:Helvetica,Arial,sans-serif;'>
 <table width='100%' cellpadding='0' cellspacing='0' style='background:#f5f3ee;padding:32px 0;'><tr><td align='center'>
@@ -312,53 +334,46 @@ ${transactionId ? `<tr><td style='padding:5px 0;font-size:13px;color:#888;'>Nomb
 </td></tr>
 <tr><td style='padding:32px;'>
 <h2 style='margin:0 0 8px;color:#0d0d0d;font-size:20px;'>Hi ${firstName}, your booking is confirmed!</h2>
-<p style='margin:0 0 20px;color:#444;font-size:14px;line-height:1.7;'>
-  Great news! We've received your payment and your booking at <strong>${VENUE_NAME}</strong> is now confirmed.
-</p>
+<p style='margin:0 0 20px;color:#444;font-size:14px;line-height:1.7;'>Great news! We've received your payment and your booking at <strong>${VENUE_NAME}</strong> is now confirmed.</p>
 <table width='100%' cellpadding='0' cellspacing='0' style='background:#f5f3ee;border-radius:8px;margin-bottom:24px;'><tr><td style='padding:20px;'>
 <p style='margin:0 0 12px;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#0d0d0d;'>Booking Details</p>
 <table width='100%' cellpadding='0' cellspacing='0'>
 <tr><td style='padding:5px 0;font-size:13px;color:#888;width:40%;'>Booking Reference</td><td style='padding:5px 0;font-size:15px;font-weight:700;color:#0d0d0d;letter-spacing:.05em;font-family:monospace;'>${booking.reference}</td></tr>
 <tr><td style='padding:5px 0;font-size:13px;color:#888;'>Date(s)</td><td style='padding:5px 0;font-size:13px;color:#222;font-weight:500;'>${dateLabel}</td></tr>
-<tr><td style='padding:5px 0;font-size:13px;color:#888;'>Time</td><td style='padding:5px 0;font-size:13px;color:#222;font-weight:500;'>${booking.start_time?.slice(0, 5)} – ${booking.end_time?.slice(0, 5)}</td></tr>
+<tr><td style='padding:5px 0;font-size:13px;color:#888;'>Time</td><td style='padding:5px 0;font-size:13px;color:#222;font-weight:500;'>${String(booking.start_time).slice(0, 5)} – ${String(booking.end_time).slice(0, 5)}</td></tr>
 ${amountStr ? `<tr><td style='padding:5px 0;font-size:13px;color:#888;'>Amount Paid</td><td style='padding:5px 0;font-size:13px;color:#16a34a;font-weight:700;'>${amountStr}</td></tr>` : ""}
 </table>
 </td></tr></table>
-<div style='background:#fef3c7;border:1px solid #fbbf24;border-radius:8px;padding:12px 16px;margin-bottom:20px;'>
-<p style='margin:0;font-size:13px;color:#92400e;font-weight:600;'>⚠️ Non-Refundable: This booking cannot be cancelled or refunded.</p>
-</div>
-<p style='margin:0 0 20px;color:#444;font-size:14px;line-height:1.7;'>
-  If you have any questions, please don't hesitate to reach out to us at
-  <a href='mailto:${NOTIFICATION_EMAIL}' style='color:#c9a84c;'>${NOTIFICATION_EMAIL}</a>.
-</p>
+${CANCELLATION_HTML}
+<p style='margin:0 0 20px;color:#444;font-size:14px;line-height:1.7;'>If you have any questions, please don't hesitate to reach out to us at <a href='mailto:${NOTIFICATION_EMAIL}' style='color:#c9a84c;'>${NOTIFICATION_EMAIL}</a>.</p>
 </td></tr>
 <tr><td style='background:#0d0d0d;padding:20px 32px;text-align:center;'>
 <p style='margin:0;font-size:11px;color:#c9a84c;opacity:.9;'>© ${year} ${VENUE_NAME} · 29b Olorunnimbe Street, Wemabod Estate, Ikeja, Lagos</p>
 </td></tr>
 </table></td></tr></table></body></html>`;
 
-      // Generate a paid receipt PDF to attach to the confirmation email.
+      // Generate receipt PDF
       let receiptAttachment: { filename: string; content: Buffer }[] = [];
       try {
         const receiptBooking: InvoiceBooking = {
-          reference: booking.reference,
-          invoice_number: booking.invoice_number,
-          full_name: booking.full_name,
-          organisation: booking.organisation,
-          email: booking.email,
-          phone: booking.phone,
-          event_type: booking.event_type,
-          extras: booking.extras,
-          start_date: booking.start_date,
-          end_date: booking.end_date,
-          start_time: booking.start_time,
-          end_time: booking.end_time,
-          participants: booking.participants,
-          invoice_subtotal: booking.invoice_subtotal,
-          invoice_vat: booking.invoice_vat,
-          invoice_total: booking.invoice_total,
-          discount_applied: booking.discount_applied,
-          invoice_breakdown: booking.invoice_breakdown,
+          reference: booking.reference as string,
+          invoice_number: booking.invoice_number as string | null,
+          full_name: booking.full_name as string,
+          organisation: booking.organisation as string | null,
+          email: booking.email as string,
+          phone: booking.phone as string | null,
+          event_type: booking.event_type as string,
+          extras: booking.extras as any,
+          start_date: String(booking.start_date).slice(0, 10),
+          end_date: String(booking.end_date).slice(0, 10),
+          start_time: booking.start_time as string,
+          end_time: booking.end_time as string,
+          participants: booking.participants as number,
+          invoice_subtotal: booking.invoice_subtotal as number,
+          invoice_vat: booking.invoice_vat as number,
+          invoice_total: booking.invoice_total as number,
+          discount_applied: booking.discount_applied as string | null,
+          invoice_breakdown: booking.invoice_breakdown as string | null,
           status: "confirmed",
           payment_status: "paid",
           payment_method: verifiedPaymentMethod,
@@ -373,7 +388,7 @@ ${amountStr ? `<tr><td style='padding:5px 0;font-size:13px;color:#888;'>Amount P
       try {
         await transporter.sendMail({
           from: `"${VENUE_NAME}" <${process.env.SMTP_EMAIL}>`,
-          to: booking.email,
+          to: booking.email as string,
           replyTo: NOTIFICATION_EMAIL,
           subject: `✅ Booking Confirmed — ${VENUE_NAME} · Ref: ${booking.reference}`,
           text: stripHtml(customerHtml),
@@ -401,7 +416,7 @@ ${amountStr ? `<tr><td style='padding:5px 0;font-size:13px;color:#888;'>Amount P
 <tr><td style='padding:5px 0;font-size:13px;color:#888;width:40%;'>Booking Ref</td><td style='padding:5px 0;font-size:13px;color:#222;font-weight:700;font-family:monospace;'>${booking.reference}</td></tr>
 <tr><td style='padding:5px 0;font-size:13px;color:#888;'>Customer</td><td style='padding:5px 0;font-size:13px;color:#222;font-weight:500;'>${booking.full_name} &lt;${booking.email}&gt;</td></tr>
 <tr><td style='padding:5px 0;font-size:13px;color:#888;'>Date(s)</td><td style='padding:5px 0;font-size:13px;color:#222;font-weight:500;'>${dateLabel}</td></tr>
-<tr><td style='padding:5px 0;font-size:13px;color:#888;'>Time</td><td style='padding:5px 0;font-size:13px;color:#222;font-weight:500;'>${booking.start_time?.slice(0, 5)} – ${booking.end_time?.slice(0, 5)}</td></tr>
+<tr><td style='padding:5px 0;font-size:13px;color:#888;'>Time</td><td style='padding:5px 0;font-size:13px;color:#222;font-weight:500;'>${String(booking.start_time).slice(0, 5)} – ${String(booking.end_time).slice(0, 5)}</td></tr>
 ${amountStr ? `<tr><td style='padding:5px 0;font-size:13px;color:#888;'>Amount Paid</td><td style='padding:5px 0;font-size:13px;color:#16a34a;font-weight:700;'>${amountStr}</td></tr>` : ""}
 <tr><td style='padding:5px 0;font-size:13px;color:#888;'>Payment Method</td><td style='padding:5px 0;font-size:13px;color:#222;font-weight:500;'>${verifiedPaymentMethod}</td></tr>
 ${transactionId ? `<tr><td style='padding:5px 0;font-size:13px;color:#888;'>Nomba Tx ID</td><td style='padding:5px 0;font-size:11px;color:#666;font-family:monospace;word-break:break-all;'>${transactionId}</td></tr>` : ""}

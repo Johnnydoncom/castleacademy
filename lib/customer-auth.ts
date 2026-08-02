@@ -1,6 +1,8 @@
 import { cookies } from "next/headers";
 import { createHmac, timingSafeEqual } from "crypto";
-import { sql } from "./db";
+import { db } from "./db";
+import { customers } from "./db/schema";
+import { eq } from "drizzle-orm";
 
 /**
  * Customer session auth — mirrors the admin HMAC-cookie pattern but with a
@@ -61,12 +63,24 @@ export async function getCustomerSession(): Promise<CustomerSession | null> {
   const id = payload.split(":")[0];
   if (!id) return null;
   try {
-    const rows = await sql`
-      SELECT id, full_name, email, phone FROM customers WHERE id = ${id}::uuid LIMIT 1
-    `;
+    const rows = await db
+      .select({
+        id: customers.id,
+        full_name: customers.fullName,
+        email: customers.email,
+        phone: customers.phone,
+      })
+      .from(customers)
+      .where(eq(customers.id, Number(id)))
+      .limit(1);
     if (rows.length === 0) return null;
-    const r = rows[0] as CustomerSession;
-    return { id: r.id, full_name: r.full_name, email: r.email, phone: r.phone };
+    const r = rows[0];
+    return {
+      id: String(r.id),
+      full_name: String(r.full_name),
+      email: String(r.email),
+      phone: r.phone ? String(r.phone) : null,
+    };
   } catch {
     return null;
   }

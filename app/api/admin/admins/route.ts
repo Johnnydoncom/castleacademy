@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
-import { sql } from "@/lib/db";
+import { db } from "@/lib/db";
+import { admins } from "@/lib/db/schema";
+import { eq, asc } from "drizzle-orm";
 import { isOwner } from "@/lib/auth";
 import bcrypt from "bcryptjs";
 
@@ -14,11 +16,15 @@ export async function GET() {
   }
 
   try {
-    const rows = await sql`
-      SELECT id, username, role, created_at
-      FROM admins
-      ORDER BY created_at ASC
-    `;
+    const rows = await db
+      .select({
+        id: admins.id,
+        username: admins.username,
+        role: admins.role,
+        created_at: admins.createdAt,
+      })
+      .from(admins)
+      .orderBy(asc(admins.createdAt));
     return NextResponse.json({ admins: rows });
   } catch (err) {
     console.error("[admin/admins] GET error:", err);
@@ -42,17 +48,21 @@ export async function POST(req: Request) {
     }
 
     // Check if user exists
-    const existing = await sql`SELECT id FROM admins WHERE username = ${username} LIMIT 1`;
+    const existing = await db
+      .select({ id: admins.id })
+      .from(admins)
+      .where(eq(admins.username, username))
+      .limit(1);
     if (existing.length > 0) {
       return NextResponse.json({ error: "Username already exists" }, { status: 400 });
     }
 
     const hash = await bcrypt.hash(password, 10);
 
-    await sql`
-      INSERT INTO admins (username, password_hash)
-      VALUES (${username}, ${hash})
-    `;
+    await db.insert(admins).values({
+      username,
+      passwordHash: hash,
+    });
 
     return NextResponse.json({ success: true });
   } catch (err) {
@@ -75,12 +85,16 @@ export async function DELETE(req: Request) {
     }
 
     // Prevent deleting the default admin
-    const admin = await sql`SELECT username, role FROM admins WHERE id = ${id}::uuid LIMIT 1`;
+    const admin = await db
+      .select({ username: admins.username, role: admins.role })
+      .from(admins)
+      .where(eq(admins.id, Number(id)))
+      .limit(1);
     if (admin.length > 0 && (admin[0].username === "castacadmin" || admin[0].role === "owner")) {
       return NextResponse.json({ error: "Cannot delete the owner account" }, { status: 403 });
     }
 
-    await sql`DELETE FROM admins WHERE id = ${id}::uuid`;
+    await db.delete(admins).where(eq(admins.id, Number(id)));
 
     return NextResponse.json({ success: true });
   } catch (err) {

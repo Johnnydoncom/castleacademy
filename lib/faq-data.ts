@@ -43,7 +43,8 @@ export const FAQ_ITEMS: FaqItemData[] = [
     category: "booking",
     iconName: "RefreshCw",
     question: "Can I cancel or reschedule my booking?",
-    answer: "Yes, subject to cancellation policy.",
+    answer:
+      "Yes. More than 7 days before your event you can reschedule free of charge (a 5% service charge plus VAT is retained). Between 3 and 7 days, 50% of your payment is retained or applied to a new date. Within 72 hours the booking becomes non-refundable.",
   },
   {
     id: "payment-methods",
@@ -68,10 +69,27 @@ export const FAQ_ITEMS: FaqItemData[] = [
     answer: "Yes, however, no nails are allowed on the wall.",
   },
   {
-    id: "prohibited-activities",
-    category: "rules",
-    iconName: "ShieldAlert",
-    question: "Are there any prohibited activities?",
-    answer: "Yes, no smoking or harmful items allowed.",
+    id: "early-booking-incentive",
+    category: "booking",
+    iconName: "CalendarClock",
+    question: "Do you offer an Early Booking Incentive?",
+    answer:
+      "Yes! We offer a 5% discount for bookings that are confirmed and paid at least 14 days in advance.",
+  },
+  {
+    id: "referral-rewards",
+    category: "booking",
+    iconName: "Sparkles",
+    question: "How do Referral Rewards work?",
+    answer:
+      "When you refer an organization or colleague to Castle Academy and they complete a booking, you receive a ₦10,000 credit toward your next booking OR 1 free extra hour.",
+  },
+  {
+    id: "loyalty-discounts",
+    category: "booking",
+    iconName: "Sparkles",
+    question: "Do you have multi-day or loyalty discounts?",
+    answer:
+      "Yes! Multi-day bookings receive 5% off for 2 consecutive days, and 10% off for 3–5 days. Repeat clients get 10% off their 6th booking after 5 bookings, and 1 complimentary 3-hour session after 10 bookings.",
   },
 ];

@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
-import { sql } from "@/lib/db";
+import { db } from "@/lib/db";
+import { bookings } from "@/lib/db/schema";
+import { and, eq, or, sql } from "drizzle-orm";
 import { isOwner } from "@/lib/auth";
+import { purgeExpiredQuotes } from "@/lib/quote-store";
 
 export const runtime = "nodejs";
 
@@ -12,19 +15,17 @@ export const runtime = "nodejs";
  *
  * 1. GRACE PERIOD EXPIRY
  *    Pending + unpaid bookings that are still in the future but were created
- *    more than 6 hours ago → "expired".  The 6-hour window is the soft-lock
- *    payment grace period.
+ *    more than 6 hours ago → "expired".
  *
  * 2. PAST-EVENT CLEANUP
  *    Any booking (pending or confirmed) whose event end date+time is now in
  *    the past is updated:
  *      - confirmed + paid  → "completed"
- *      - pending  + unpaid → "expired"  (no payment ever came through)
+ *      - pending  + unpaid → "expired"
  *      - anything else     → "expired"
  *
  * Auth: owner admin session  OR  x-cron-secret header.
  */
-
 
 async function authorize(req: Request): Promise<boolean> {
   const secret = process.env.CRON_SECRET || process.env.ADMIN_SECRET;
@@ -35,37 +36,36 @@ async function authorize(req: Request): Promise<boolean> {
 
 async function runSweeps() {
   // ── 1. Grace-period expiry (future bookings, unpaid > 6h) ─────────────────
-  const gracePeriodExpired = await sql`
-    UPDATE bookings
-    SET status = 'expired', updated_at = NOW()
-    WHERE status = 'pending'
-      AND payment_status = 'unpaid'
-      AND (end_date > CURRENT_DATE OR (end_date = CURRENT_DATE AND end_time::time > CURRENT_TIME))
-      AND created_at < NOW() - INTERVAL '6 hours'
-    RETURNING reference
-  `;
+  const graceResult = await db
+    .update(bookings)
+    .set({ status: "expired", updatedAt: sql`NOW()` })
+    .where(
+      and(
+        eq(bookings.status, "pending"),
+        eq(bookings.paymentStatus, "unpaid"),
+        sql`(${bookings.endDate} > CURDATE() OR (${bookings.endDate} = CURDATE() AND ${bookings.endTime} > CURTIME()))`,
+        sql`${bookings.createdAt} < DATE_SUB(NOW(), INTERVAL 6 HOUR)`
+      )
+    );
+  const gracePeriodExpired = (graceResult as any)[0]?.affectedRows ?? 0;
 
   // ── 2. Past-event cleanup ──────────────────────────────────────────────────
-  // Any pending or confirmed booking whose event end date+time has passed
-  // and was never paid → mark expired.
-  // NOTE: paid+confirmed past bookings intentionally stay 'confirmed';
-  // the DB CHECK constraint only allows: pending | confirmed | cancelled | expired.
-  const pastExpired = await sql`
-    UPDATE bookings
-    SET status = 'expired', updated_at = NOW()
-    WHERE status IN ('pending', 'confirmed')
-      AND payment_status IN ('unpaid', 'pending')
-      AND (end_date < CURRENT_DATE OR (
-            end_date = CURRENT_DATE AND
-            end_time::time < CURRENT_TIME
-          ))
-    RETURNING reference
-  `;
+  const pastResult = await db
+    .update(bookings)
+    .set({ status: "expired", updatedAt: sql`NOW()` })
+    .where(
+      and(
+        sql`${bookings.status} IN ('pending', 'confirmed')`,
+        sql`${bookings.paymentStatus} IN ('unpaid', 'pending')`,
+        sql`(${bookings.endDate} < CURDATE() OR (${bookings.endDate} = CURDATE() AND ${bookings.endTime} < CURTIME()))`
+      )
+    );
+  const pastExpired = (pastResult as any)[0]?.affectedRows ?? 0;
 
-  return {
-    gracePeriodExpired: gracePeriodExpired.map((r) => r.reference),
-    pastExpired: pastExpired.map((r) => r.reference),
-  };
+  // ── 3. Drop stale price quotes ─────────────────────────────────────────────
+  const purgedQuotes = await purgeExpiredQuotes();
+
+  return { gracePeriodExpired, pastExpired, purgedQuotes };
 }
 
 export async function GET(req: Request) {
@@ -75,13 +75,11 @@ export async function GET(req: Request) {
 
   try {
     const result = await runSweeps();
-    const totalChanged =
-      result.gracePeriodExpired.length +
-      result.pastExpired.length;
+    const totalChanged = result.gracePeriodExpired + result.pastExpired;
 
     console.log("[cron/expire-pending]", {
-      gracePeriodExpired: result.gracePeriodExpired.length,
-      pastExpired: result.pastExpired.length,
+      gracePeriodExpired: result.gracePeriodExpired,
+      pastExpired: result.pastExpired,
     });
 
     return NextResponse.json({

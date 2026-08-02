@@ -20,7 +20,7 @@ export function FinalCTA() {
             size="lg"
             className="rounded-full bg-gold px-8 text-royal-deep hover:bg-gold-soft"
           >
-            <a href="#book">
+            <a href="/booking">
               Book Your Training Space Today <ArrowRight className="ml-1 h-4 w-4" aria-hidden="true" />
             </a>
           </Button>

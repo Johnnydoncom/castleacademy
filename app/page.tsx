@@ -3,9 +3,10 @@ import { Hero } from "@/components/hero";
 import { Why } from "@/components/why";
 import { PerfectFor } from "@/components/perfect-for";
 import { Pricing } from "@/components/pricing";
+import { PoliciesAndIncentives } from "@/components/policies-incentives";
 import { How } from "@/components/how";
 import { Gallery } from "@/components/gallery";
-import { Booking } from "@/components/booking";
+import { BookingBanner } from "@/components/booking-banner";
 import { Testimonials } from "@/components/testimonials";
 import { Faq } from "@/components/faq";
 import { FAQ_ITEMS } from "@/lib/faq-data";
@@ -97,9 +98,10 @@ export default function Page() {
         <Why />
         <PerfectFor />
         <Pricing />
+        <PoliciesAndIncentives />
         <How />
         <Gallery />
-        <Booking />
+        <BookingBanner />
         <Testimonials />
         <Faq />
         <Location />

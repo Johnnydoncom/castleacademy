@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
-import { sql, friendlyDbError } from "@/lib/db";
+import { db } from "@/lib/db";
+import { customers, bookings } from "@/lib/db/schema";
+import { eq, isNull, sql } from "drizzle-orm";
+import { friendlyDbError } from "@/lib/db";
 import bcrypt from "bcryptjs";
 import { buildCustomerCookie, buildClearCustomerCookie, normalizeEmail } from "@/lib/customer-auth";
 
@@ -19,30 +22,35 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Email and password are required." }, { status: 400 });
     }
 
-    const rows = await sql`
-      SELECT id, password_hash FROM customers WHERE email = ${email} LIMIT 1
-    `;
+    const rows = await db
+      .select({ id: customers.id, passwordHash: customers.passwordHash })
+      .from(customers)
+      .where(eq(customers.email, email))
+      .limit(1);
+
     if (rows.length === 0) {
       return NextResponse.json({ error: "Invalid email or password." }, { status: 401 });
     }
 
-    const match = await bcrypt.compare(password, rows[0].password_hash);
+    const match = await bcrypt.compare(password, String(rows[0].passwordHash));
     if (!match) {
       return NextResponse.json({ error: "Invalid email or password." }, { status: 401 });
     }
 
     // Opportunistically link any guest bookings for this email (non-fatal)
     try {
-      await sql`
-        UPDATE bookings SET customer_id = ${rows[0].id}::uuid
-        WHERE customer_id IS NULL AND LOWER(email) = ${email}
-      `;
+      await db
+        .update(bookings)
+        .set({ customerId: rows[0].id })
+        .where(
+          sql`${bookings.customerId} IS NULL AND LOWER(${bookings.email}) = ${email}`
+        );
     } catch (linkErr) {
       console.error("[customer/login] guest-booking link skipped:", linkErr);
     }
 
     const res = NextResponse.json({ success: true });
-    res.headers.append("Set-Cookie", buildCustomerCookie(rows[0].id));
+    res.headers.append("Set-Cookie", buildCustomerCookie(String(rows[0].id)));
     return res;
   } catch (err) {
     console.error("[customer/login] error:", err);

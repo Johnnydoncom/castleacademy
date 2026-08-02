@@ -1,20 +1,26 @@
 import { Logo } from "@/components/logo";
-import { sql } from "@/lib/db";
+import { db } from "@/lib/db";
+import { socialLinks as socialLinksTable } from "@/lib/db/schema";
+import { sql } from "drizzle-orm";
 import { Facebook, Instagram, Twitter, Youtube, Linkedin, Link as LinkIcon } from "lucide-react";
 
 const NAV_LINKS = [
   { href: "#why", label: "Why Castle" },
   { href: "#pricing", label: "Pricing" },
+  { href: "#policies", label: "Policies & Rewards" },
   { href: "#how", label: "How it works" },
   { href: "#gallery", label: "Gallery" },
   { href: "#faq", label: "FAQ" },
-  { href: "#book", label: "Book" },
+  { href: "/booking", label: "Book" },
 ];
 
 export async function Footer() {
   let socialLinks: Record<string, string> = {};
   try {
-    const rows = await sql`SELECT platform, url FROM social_links WHERE url IS NOT NULL AND url != ''`;
+    const rows = await db
+      .select({ platform: socialLinksTable.platform, url: socialLinksTable.url })
+      .from(socialLinksTable)
+      .where(sql`${socialLinksTable.url} IS NOT NULL AND ${socialLinksTable.url} != ''`);
     for (const row of rows) {
       socialLinks[row.platform as string] = row.url as string;
     }

@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
-import { sql } from "@/lib/db";
+import { db } from "@/lib/db";
+import { customers } from "@/lib/db/schema";
+import { eq, sql } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { getCustomerSession } from "@/lib/customer-auth";
 
@@ -38,22 +40,31 @@ export async function PATCH(req: Request) {
       if (String(body.newPassword).length < 8) {
         return NextResponse.json({ error: "New password must be at least 8 characters." }, { status: 400 });
       }
-      const rows = await sql`SELECT password_hash FROM customers WHERE id = ${session.id}::uuid LIMIT 1`;
-      const ok = rows.length > 0 && (await bcrypt.compare(String(body.currentPassword || ""), rows[0].password_hash));
+      const rows = await db
+        .select({ passwordHash: customers.passwordHash })
+        .from(customers)
+        .where(eq(customers.id, Number(session.id)))
+        .limit(1);
+      const ok = rows.length > 0 && (await bcrypt.compare(String(body.currentPassword || ""), String(rows[0].passwordHash)));
       if (!ok) {
         return NextResponse.json({ error: "Current password is incorrect." }, { status: 400 });
       }
       const newHash = await bcrypt.hash(String(body.newPassword), 10);
-      await sql`UPDATE customers SET password_hash = ${newHash}, updated_at = NOW() WHERE id = ${session.id}::uuid`;
+      await db
+        .update(customers)
+        .set({ passwordHash: newHash, updatedAt: sql`NOW()` })
+        .where(eq(customers.id, Number(session.id)));
     }
 
-    await sql`
-      UPDATE customers SET
-        full_name  = COALESCE(${fullName}, full_name),
-        phone      = COALESCE(${phone}, phone),
-        updated_at = NOW()
-      WHERE id = ${session.id}::uuid
-    `;
+    // Update profile fields using COALESCE to only overwrite non-null values
+    await db
+      .update(customers)
+      .set({
+        fullName: fullName != null ? fullName : sql`full_name`,
+        phone: phone != null ? phone : sql`phone`,
+        updatedAt: sql`NOW()`,
+      })
+      .where(eq(customers.id, Number(session.id)));
 
     return NextResponse.json({ success: true });
   } catch (err) {

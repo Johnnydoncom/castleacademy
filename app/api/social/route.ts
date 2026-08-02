@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
-import { sql } from "@/lib/db";
+import { db } from "@/lib/db";
+import { socialLinks } from "@/lib/db/schema";
+import { eq, asc, sql } from "drizzle-orm";
 import { getAdminSession } from "@/lib/auth";
 
 const SUPPORTED_PLATFORMS = [
@@ -12,9 +14,10 @@ const SUPPORTED_PLATFORMS = [
  */
 export async function GET() {
   try {
-    const rows = await sql`
-      SELECT platform, url FROM social_links ORDER BY platform
-    `;
+    const rows = await db
+      .select({ platform: socialLinks.platform, url: socialLinks.url })
+      .from(socialLinks)
+      .orderBy(asc(socialLinks.platform));
     const links: Record<string, string> = {};
     for (const row of rows) {
       links[row.platform as string] = row.url as string;
@@ -62,12 +65,13 @@ export async function PUT(req: Request) {
 
     const sanitizedUrl = typeof url === "string" ? url.trim() : "";
 
-    await sql`
-      INSERT INTO social_links (platform, url, updated_at)
-      VALUES (${platform}, ${sanitizedUrl}, NOW())
-      ON CONFLICT (platform)
-      DO UPDATE SET url = EXCLUDED.url, updated_at = NOW()
-    `;
+    // MySQL upsert: ON DUPLICATE KEY UPDATE (replaces PostgreSQL ON CONFLICT)
+    await db
+      .insert(socialLinks)
+      .values({ platform, url: sanitizedUrl, updatedAt: sql`NOW()` })
+      .onDuplicateKeyUpdate({
+        set: { url: sanitizedUrl, updatedAt: sql`NOW()` },
+      });
 
     return NextResponse.json({ success: true, platform, url: sanitizedUrl });
   } catch (err) {

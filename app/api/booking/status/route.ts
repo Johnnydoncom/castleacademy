@@ -1,62 +1,51 @@
 import { NextResponse } from "next/server";
-import { sql } from "@/lib/db";
+import { db } from "@/lib/db";
+import { bookings } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
+
+const REF_RE = /^CA-\d{8}-[A-F0-9]{6}$/;
 
 /**
- * GET /api/booking/status?ref=CA-YYYYMMDD-XXXXXX
- * Public read-only endpoint. Returns booking status and payment info for a given reference.
- * Used by the /booking/callback page to show post-payment confirmation state.
+ * GET /api/booking/status?ref=CA-XXXXXXXX-XXXXXX
+ * Returns the live status of a booking (public — reference acts as the secret).
  */
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const ref = searchParams.get("ref");
 
-  if (!ref || !/^CA-\d{8}-[A-F0-9]{6}$/.test(ref)) {
-    return NextResponse.json({ error: "Invalid booking reference" }, { status: 400 });
+  if (!ref || !REF_RE.test(ref)) {
+    return NextResponse.json({ error: "Invalid or missing reference" }, { status: 400 });
   }
 
   try {
-    const rows = await sql`
-      SELECT
-        reference,
-        full_name,
-        email,
-        event_type,
-        start_date::text,
-        end_date::text,
-        start_time::text,
-        end_time::text,
-        participants,
-        status,
-        payment_status,
-        invoice_total,
-        paid_at
-      FROM bookings
-      WHERE reference = ${ref}
-      LIMIT 1
-    `;
+    const rows = await db
+      .select({
+        reference: bookings.reference,
+        fullName: bookings.fullName,
+        eventType: bookings.eventType,
+        startDate: bookings.startDate,
+        endDate: bookings.endDate,
+        startTime: bookings.startTime,
+        endTime: bookings.endTime,
+        participants: bookings.participants,
+        status: bookings.status,
+        paymentStatus: bookings.paymentStatus,
+        invoiceTotal: bookings.invoiceTotal,
+        checkoutLink: bookings.checkoutLink,
+        paidAt: bookings.paidAt,
+      })
+      .from(bookings)
+      .where(eq(bookings.reference, ref))
+      .limit(1);
 
     if (rows.length === 0) {
       return NextResponse.json({ error: "Booking not found" }, { status: 404 });
     }
 
-    const booking = rows[0];
-
-    return NextResponse.json({
-      reference: booking.reference,
-      fullName: booking.full_name,
-      eventType: booking.event_type,
-      startDate: booking.start_date,
-      endDate: booking.end_date,
-      startTime: booking.start_time?.slice(0, 5),
-      endTime: booking.end_time?.slice(0, 5),
-      participants: booking.participants,
-      status: booking.status,
-      paymentStatus: booking.payment_status,
-      invoiceTotal: booking.invoice_total,
-      paidAt: booking.paid_at,
-    });
+    // Return flat object — the callback page reads this directly as BookingStatus
+    return NextResponse.json(rows[0]);
   } catch (err) {
-    console.error("[api/booking/status] Error:", err);
+    console.error("[booking/status] error:", err);
     return NextResponse.json({ error: "Failed to fetch booking status" }, { status: 500 });
   }
 }

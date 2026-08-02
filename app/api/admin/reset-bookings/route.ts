@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { sql } from "@/lib/db";
+import { db } from "@/lib/db";
+import { bookings } from "@/lib/db/schema";
 import { isOwner } from "@/lib/auth";
 
 // Destructive reset is owner-only.
@@ -14,7 +15,7 @@ export async function DELETE() {
 
   try {
     // Delete all bookings. (Admin records, blocked slots, and settings remain untouched)
-    await sql`DELETE FROM bookings`;
+    await db.delete(bookings);
     
     return NextResponse.json({ success: true });
   } catch (err) {

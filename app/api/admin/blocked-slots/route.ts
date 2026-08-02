@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
-import { sql } from "@/lib/db";
+import { db } from "@/lib/db";
+import { blockedSlots } from "@/lib/db/schema";
+import { eq, desc, asc } from "drizzle-orm";
 import { verifyToken } from "@/lib/auth";
 import { cookies } from "next/headers";
+
 
 async function checkAuth() {
   const store = await cookies();
@@ -16,12 +19,21 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   try {
-    const rows = await sql`
-      SELECT id, slot_date::text AS slot_date, start_time::text, end_time::text, reason, created_at
-      FROM blocked_slots
-      ORDER BY slot_date DESC, start_time
-    `;
-    return NextResponse.json({ blockedSlots: rows });
+    const rows = await db
+      .select()
+      .from(blockedSlots)
+      .orderBy(desc(blockedSlots.slotDate), asc(blockedSlots.startTime));
+
+    // Format dates/times in JS (previously done by DATE_FORMAT / TIME_FORMAT in SQL)
+    const formatted = rows.map((r) => ({
+      id: r.id,
+      slot_date: String(r.slotDate).slice(0, 10),
+      start_time: String(r.startTime).slice(0, 5),
+      end_time: String(r.endTime).slice(0, 5),
+      reason: r.reason,
+      created_at: r.createdAt,
+    }));
+    return NextResponse.json({ blockedSlots: formatted });
   } catch (err) {
     console.error("[admin/blocked-slots] GET error:", err);
     return NextResponse.json({ error: "Failed to fetch blocked slots" }, { status: 500 });
@@ -38,19 +50,38 @@ export async function POST(req: Request) {
     if (!slotDate || !startTime || !endTime) {
       return NextResponse.json({ error: "slotDate, startTime and endTime are required" }, { status: 400 });
     }
-    const rows = await sql`
-      INSERT INTO blocked_slots (slot_date, start_time, end_time, reason)
-      VALUES (${slotDate}::date, ${startTime}::time, ${endTime}::time, ${reason ?? null})
-      RETURNING id, slot_date::text AS slot_date, start_time::text, end_time::text, reason
-    `;
-    return NextResponse.json({ success: true, blockedSlot: rows[0] }, { status: 201 });
+    await db.insert(blockedSlots).values({
+      slotDate,
+      startTime,
+      endTime,
+      reason: reason ?? null,
+    });
+
+    const rows = await db
+      .select()
+      .from(blockedSlots)
+      .where(eq(blockedSlots.slotDate, slotDate))
+      .orderBy(desc(blockedSlots.id))
+      .limit(1);
+
+    const slot = rows[0];
+    return NextResponse.json({
+      success: true,
+      blockedSlot: {
+        id: slot.id,
+        slot_date: String(slot.slotDate).slice(0, 10),
+        start_time: String(slot.startTime).slice(0, 5),
+        end_time: String(slot.endTime).slice(0, 5),
+        reason: slot.reason,
+      },
+    }, { status: 201 });
   } catch (err) {
     console.error("[admin/blocked-slots] POST error:", err);
     return NextResponse.json({ error: "Failed to create blocked slot" }, { status: 500 });
   }
 }
 
-/** DELETE /api/admin/blocked-slots?id=<uuid> — remove a blocked slot */
+/** DELETE /api/admin/blocked-slots?id=<id> — remove a blocked slot */
 export async function DELETE(req: Request) {
   if (!(await checkAuth())) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -59,7 +90,7 @@ export async function DELETE(req: Request) {
     const { searchParams } = new URL(req.url);
     const id = searchParams.get("id");
     if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
-    await sql`DELETE FROM blocked_slots WHERE id = ${id}::uuid`;
+    await db.delete(blockedSlots).where(eq(blockedSlots.id, Number(id)));
     return NextResponse.json({ success: true });
   } catch (err) {
     console.error("[admin/blocked-slots] DELETE error:", err);

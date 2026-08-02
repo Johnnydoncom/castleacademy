@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { CANCELLATION_SUMMARY_TEXT } from "@/lib/policy";
 
 interface BookingStatus {
   reference: string;
@@ -212,7 +213,10 @@ export default function BookingCallbackPage() {
 
               <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
                 <p className="text-xs font-semibold text-amber-800">
-                  ⚠️ Non-Refundable: This booking cannot be cancelled or refunded.
+                  Cancellation &amp; rescheduling
+                </p>
+                <p className="mt-1 text-xs leading-relaxed text-amber-800/90">
+                  {CANCELLATION_SUMMARY_TEXT}
                 </p>
               </div>
 

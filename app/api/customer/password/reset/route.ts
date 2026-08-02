@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
-import { sql, friendlyDbError } from "@/lib/db";
+import { db } from "@/lib/db";
+import { customers, passwordResetTokens } from "@/lib/db/schema";
+import { eq, sql } from "drizzle-orm";
+import { friendlyDbError } from "@/lib/db";
 import bcrypt from "bcryptjs";
 import { createHash } from "crypto";
 import { buildCustomerCookie } from "@/lib/customer-auth";
@@ -23,11 +26,15 @@ export async function POST(req: Request) {
     }
 
     const tokenHash = createHash("sha256").update(token).digest("hex");
-    const rows = await sql`
-      SELECT customer_id FROM password_reset_tokens
-      WHERE token_hash = ${tokenHash} AND used = false AND expires_at > NOW()
-      LIMIT 1
-    `;
+
+    const rows = await db
+      .select({ customerId: passwordResetTokens.customerId })
+      .from(passwordResetTokens)
+      .where(
+        sql`${passwordResetTokens.tokenHash} = ${tokenHash} AND ${passwordResetTokens.used} = 0 AND ${passwordResetTokens.expiresAt} > NOW()`
+      )
+      .limit(1);
+
     if (rows.length === 0) {
       return NextResponse.json(
         { error: "This reset link is invalid or has expired. Please request a new one." },
@@ -35,16 +42,23 @@ export async function POST(req: Request) {
       );
     }
 
-    const customerId = rows[0].customer_id as string;
+    const customerId = rows[0].customerId;
     const passwordHash = await bcrypt.hash(String(password), 10);
 
-    await sql`UPDATE customers SET password_hash = ${passwordHash}, updated_at = NOW() WHERE id = ${customerId}::uuid`;
+    await db
+      .update(customers)
+      .set({ passwordHash, updatedAt: sql`NOW()` })
+      .where(eq(customers.id, Number(customerId)));
+
     // Consume every outstanding token for this customer.
-    await sql`UPDATE password_reset_tokens SET used = true WHERE customer_id = ${customerId}::uuid`;
+    await db
+      .update(passwordResetTokens)
+      .set({ used: 1 })
+      .where(eq(passwordResetTokens.customerId, Number(customerId)));
 
     // Sign the customer in for a smooth hand-off to the dashboard.
     const res = NextResponse.json({ success: true, message: "Password updated. You're now signed in." });
-    res.headers.append("Set-Cookie", buildCustomerCookie(customerId));
+    res.headers.append("Set-Cookie", buildCustomerCookie(String(customerId)));
     return res;
   } catch (err) {
     console.error("[password/reset] error:", err);

@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
-import { sql } from "@/lib/db";
+import { db } from "@/lib/db";
+import { bookings } from "@/lib/db/schema";
+import { eq, sql } from "drizzle-orm";
 import { getCustomerSession } from "@/lib/customer-auth";
 import { resendInvoiceEmail, resendReceiptEmail, notifyAdminReschedule } from "@/lib/mailer";
 import { createCheckoutOrder } from "@/lib/nomba";
@@ -9,12 +11,13 @@ const REF_RE = /^CA-\d{8}-[A-F0-9]{6}$/;
 const APP_URL = process.env.APP_URL || "https://thecastleacademy.com";
 
 async function loadOwnedBooking(ref: string, session: { id: string; email: string }) {
-  const rows = await sql`
-    SELECT * FROM bookings
-    WHERE reference = ${ref}
-      AND (customer_id = ${session.id}::uuid OR LOWER(email) = ${session.email})
-    LIMIT 1
-  `;
+  const rows = await db
+    .select()
+    .from(bookings)
+    .where(
+      sql`${bookings.reference} = ${ref} AND (${bookings.customerId} = ${session.id} OR LOWER(${bookings.email}) = ${session.email})`
+    )
+    .limit(1);
   return rows[0] || null;
 }
 
@@ -33,10 +36,6 @@ export async function GET(_req: Request, { params }: { params: Promise<{ ref: st
 /**
  * POST /api/customer/bookings/[ref]
  * Body: { action: "reschedule" | "resend" | "generate_checkout" | "cancel", ... }
- *   reschedule:         { date, startTime, endTime, reason? }
- *   resend:             re-emails invoice (unpaid) or receipt (paid)
- *   generate_checkout:  creates a fresh Nomba checkout link for unpaid bookings
- *   cancel:             cancels an unpaid pending booking
  */
 export async function POST(req: Request, { params }: { params: Promise<{ ref: string }> }) {
   const session = await getCustomerSession();
@@ -55,7 +54,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ ref: st
     if (action === "resend") {
       const ib = booking as unknown as InvoiceBooking;
       const sent =
-        booking.payment_status === "paid"
+        booking.paymentStatus === "paid"
           ? await resendReceiptEmail(ib)
           : await resendInvoiceEmail(ib);
       if (!sent) {
@@ -66,30 +65,31 @@ export async function POST(req: Request, { params }: { params: Promise<{ ref: st
 
     // ── Generate a fresh Nomba checkout link ─────────────────────────────
     if (action === "generate_checkout") {
-      if (booking.payment_status === "paid") {
+      if (booking.paymentStatus === "paid") {
         return NextResponse.json({ error: "This booking is already paid." }, { status: 409 });
       }
       if (!["pending", "confirmed"].includes(booking.status)) {
         return NextResponse.json({ error: "Cannot generate a payment link for this booking." }, { status: 400 });
       }
-      if (!booking.invoice_total || Number(booking.invoice_total) <= 0) {
+      if (!booking.invoiceTotal || Number(booking.invoiceTotal) <= 0) {
         return NextResponse.json({ error: "Booking has no invoice total. Please contact support." }, { status: 400 });
       }
 
       const nombaOrder = await createCheckoutOrder({
-        orderReference: ref + "-" + Date.now(), // unique suffix avoids Nomba duplicate order error
-        amount: Number(booking.invoice_total),
+        orderReference: ref + "-" + Date.now(),
+        amount: Number(booking.invoiceTotal),
         customerEmail: booking.email,
         callbackUrl: `${APP_URL}/booking/callback?ref=${ref}`,
       });
 
-      await sql`
-        UPDATE bookings SET
-          nomba_order_ref = ${nombaOrder.orderReference},
-          checkout_link   = ${nombaOrder.checkoutLink},
-          updated_at      = NOW()
-        WHERE reference = ${ref}
-      `;
+      await db
+        .update(bookings)
+        .set({
+          nombaOrderRef: nombaOrder.orderReference,
+          checkoutLink: nombaOrder.checkoutLink,
+          updatedAt: sql`NOW()`,
+        })
+        .where(eq(bookings.reference, ref));
 
       return NextResponse.json({
         success: true,
@@ -100,7 +100,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ ref: st
 
     // ── Cancel an unpaid pending booking ─────────────────────────────────
     if (action === "cancel") {
-      if (booking.payment_status === "paid") {
+      if (booking.paymentStatus === "paid") {
         return NextResponse.json(
           { error: "Paid bookings cannot be cancelled. Please contact us directly." },
           { status: 409 }
@@ -113,12 +113,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ ref: st
         );
       }
 
-      await sql`
-        UPDATE bookings SET
-          status     = 'cancelled',
-          updated_at = NOW()
-        WHERE reference = ${ref}
-      `;
+      await db
+        .update(bookings)
+        .set({ status: "cancelled", updatedAt: sql`NOW()` })
+        .where(eq(bookings.reference, ref));
 
       return NextResponse.json({ success: true, message: "Booking cancelled." });
     }
@@ -139,12 +137,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ ref: st
       if (!["pending", "confirmed"].includes(booking.status)) {
         return NextResponse.json({ error: "This booking cannot be rescheduled." }, { status: 400 });
       }
-      if (booking.reschedule_status === "requested") {
+      if (booking.rescheduleStatus === "requested") {
         return NextResponse.json({ error: "A reschedule request is already pending review." }, { status: 409 });
       }
 
       // Policy: free rescheduling only when more than 7 days before the event.
-      const eventDate = new Date(booking.start_date + "T00:00:00");
+      const eventDate = new Date(booking.startDate + "T00:00:00");
       const daysUntil = Math.floor((eventDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
       if (daysUntil < 7) {
         return NextResponse.json(
@@ -153,21 +151,22 @@ export async function POST(req: Request, { params }: { params: Promise<{ ref: st
         );
       }
 
-      await sql`
-        UPDATE bookings SET
-          reschedule_status       = 'requested',
-          reschedule_date         = ${date}::date,
-          reschedule_start_time   = ${startTime}::time,
-          reschedule_end_time     = ${endTime}::time,
-          reschedule_reason       = ${reason},
-          reschedule_requested_at = NOW(),
-          updated_at              = NOW()
-        WHERE reference = ${ref}
-      `;
+      await db
+        .update(bookings)
+        .set({
+          rescheduleStatus: "requested",
+          rescheduleDate: date as any,
+          rescheduleStartTime: startTime,
+          rescheduleEndTime: endTime,
+          rescheduleReason: reason,
+          rescheduleRequestedAt: sql`NOW()`,
+          updatedAt: sql`NOW()`,
+        })
+        .where(eq(bookings.reference, ref));
 
       // Fire-and-forget admin notification
       notifyAdminReschedule(booking as unknown as InvoiceBooking, { date, startTime, endTime, reason: reason || undefined })
-        .catch((e) => console.error("[reschedule] admin email failed:", e));
+        .catch((e: Error) => console.error("[reschedule] admin email failed:", e));
 
       return NextResponse.json({ success: true, message: "Reschedule request submitted for review." });
     }

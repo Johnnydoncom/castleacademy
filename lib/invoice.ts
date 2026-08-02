@@ -5,12 +5,15 @@
  * No .afm font files needed — uses PDF standard-14 fonts embedded in every viewer.
  */
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage, type RGB } from "pdf-lib";
+import { CANCELLATION_COMPACT } from "./policy";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export type DocKind = "invoice" | "receipt";
 
 export interface InvoiceBooking {
+  /** Present when the row came from `SELECT *`; used to fetch the day schedule. */
+  id?: string;
   reference: string;
   invoice_number: string | null;
   full_name: string;
@@ -22,6 +25,12 @@ export interface InvoiceBooking {
   end_date: string | Date;
   start_time: string;
   end_time: string;
+  /**
+   * Per-day schedule. A booking may run different hours on each day, so the
+   * start/end columns above are only a summary. When present this is rendered
+   * instead; when absent (older records) the summary is used.
+   */
+  days?: { date: string; start_time: string; end_time: string }[] | null;
   participants: number;
   status: string;
   payment_status: string;
@@ -212,7 +221,11 @@ export async function generateBookingPdf(booking: InvoiceBooking, kind: DocKind)
   const subtotal  = Number(booking.invoice_subtotal  ?? 0);
   const vat       = Number(booking.invoice_vat       ?? 0);
   const total     = Number(booking.invoice_total     ?? 0);
-  const vatRate   = Number(process.env.VAT_RATE      ?? 7.5);
+  // Derive from the stored figures so a rate change never restates an old
+  // invoice; fall back to the env default only when the row predates them.
+  const vatRate = booking.invoice_subtotal && booking.invoice_vat
+    ? Math.round((booking.invoice_vat / booking.invoice_subtotal) * 1000) / 10
+    : Number(process.env.VAT_RATE ?? 7.5);
   const venueName = process.env.VENUE_NAME           || "Castle Academy";
   const today     = new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
   const invNo     = booking.invoice_number           || booking.reference;
@@ -266,17 +279,28 @@ export async function generateBookingPdf(booking: InvoiceBooking, kind: DocKind)
   dt(page, cap(booking.event_type), col2X, rightY, bold, 12, C_NOIR);
   rightY += 18;
 
-  const dateStr = fmtDate(booking.start_date) === fmtDate(booking.end_date)
-    ? fmtDate(booking.start_date)
-    : `${fmtDate(booking.start_date)} to ${fmtDate(booking.end_date)}`;
+  if (booking.days && booking.days.length > 0) {
+    // One line per day, so uneven programmes read correctly on the document.
+    for (const day of booking.days) {
+      for (const line of wrap(fmtDate(day.date), reg, 10, colW)) {
+        dt(page, line, col2X, rightY, reg, 10, C_NOIR);
+        rightY += 15;
+      }
+      dt(page, `${t5(day.start_time)} – ${t5(day.end_time)}`, col2X, rightY, reg, 10, C_MUTED);
+      rightY += 15;
+    }
+  } else {
+    const dateStr = fmtDate(booking.start_date) === fmtDate(booking.end_date)
+      ? fmtDate(booking.start_date)
+      : `${fmtDate(booking.start_date)} to ${fmtDate(booking.end_date)}`;
 
-  const dateLines = wrap(dateStr, reg, 10, colW);
-  for (const line of dateLines) {
-    dt(page, line, col2X, rightY, reg, 10, C_NOIR);
+    for (const line of wrap(dateStr, reg, 10, colW)) {
+      dt(page, line, col2X, rightY, reg, 10, C_NOIR);
+      rightY += 15;
+    }
+    dt(page, `${t5(booking.start_time)} – ${t5(booking.end_time)}`, col2X, rightY, reg, 10, C_MUTED);
     rightY += 15;
   }
-  dt(page, `${t5(booking.start_time)} – ${t5(booking.end_time)}`, col2X, rightY, reg, 10, C_MUTED);
-  rightY += 15;
   dt(page, `${booking.participants} participant${booking.participants !== 1 ? "s" : ""}`, col2X, rightY, reg, 10, C_MUTED);
   rightY += 15;
 
@@ -355,11 +379,11 @@ export async function generateBookingPdf(booking: InvoiceBooking, kind: DocKind)
   if (kind === "invoice") {
     dt(page, "Payment Instructions", ML, fY, bold, 9, C_WHITE);
     dt(page, "Complete payment via the secure link sent to your email to confirm your booking.", ML, fY + 16, reg, 8, rgb(0.8, 0.8, 0.8));
-    dt(page, "Bookings are non-refundable once confirmed. All prices are inclusive of VAT.", ML, fY + 30, reg, 7, rgb(0.5, 0.5, 0.5));
+    dt(page, CANCELLATION_COMPACT, ML, fY + 30, reg, 7, rgb(0.5, 0.5, 0.5));
   } else {
     dt(page, "Thank you — your booking is confirmed!", ML, fY, bold, 10, C_WHITE);
     dt(page, "For assistance please contact: thecastleacademyspace@gmail.com", ML, fY + 20, reg, 8, rgb(0.8, 0.8, 0.8));
-    dt(page, "All bookings are non-refundable. Prices are inclusive of VAT.", ML, fY + 34, reg, 7, rgb(0.5, 0.5, 0.5));
+    dt(page, CANCELLATION_COMPACT, ML, fY + 34, reg, 7, rgb(0.5, 0.5, 0.5));
   }
 
   dtC(page, `© ${new Date().getFullYear()} ${venueName}`, 0, PAGE_W, PAGE_H - 12, reg, 7, rgb(0.4, 0.4, 0.4));

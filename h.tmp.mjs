@@ -1,0 +1,10 @@
+import { Pool, neonConfig } from '@neondatabase/serverless';
+import ws from 'ws'; import fs from 'fs'; import { createHash } from 'crypto';
+neonConfig.webSocketConstructor = ws;
+const env = fs.readFileSync('.env.local','utf-8');
+const pool = new Pool({ connectionString: env.match(/DATABASE_URL="?([^"\n]+)"?/)[1] });
+const raw = (await pool.query('SELECT config, updated_at::text FROM pricing_config WHERE id=1')).rows[0];
+console.log('multiDay order in DB:', JSON.stringify(raw.config.multiDay));
+console.log('top-level key order  :', Object.keys(raw.config).join(','));
+console.log('raw hash             :', createHash('sha256').update(JSON.stringify(raw.config)).digest('hex').slice(0,16));
+await pool.end();

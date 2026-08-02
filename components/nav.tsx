@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/logo";
 import { cn } from "@/lib/utils";
+import Link from "next/link";
 
 const NAV_LINKS = [
   { href: "#why", label: "Why Castle" },
@@ -11,7 +12,7 @@ const NAV_LINKS = [
   { href: "#how", label: "How it works" },
   { href: "#gallery", label: "Gallery" },
   { href: "#faq", label: "FAQ" },
-  { href: "#book", label: "Book" },
+  { href: "/booking", label: "Book" },
 ];
 
 export function Nav() {
@@ -36,35 +37,35 @@ export function Nav() {
     >
       <div className="h-px w-full bg-gradient-to-r from-transparent via-gold/60 to-transparent" />
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-6 px-5 py-4 md:px-8 md:py-5">
-        <a href="#top" className="flex items-center gap-3 group" aria-label="Castle Academy home">
+        <Link href="#top" className="flex items-center gap-3 group" aria-label="Castle Academy home">
           <Logo tone="onDark" className="h-10 md:h-12" />
-        </a>
-        <nav className="hidden items-center gap-10 md:flex" aria-label="Main navigation">
+        </Link>
+        <nav className="hidden items-center gap-7 lg:flex xl:gap-10" aria-label="Main navigation">
           {NAV_LINKS.map((l) => (
-            <a
+            <Link
               key={l.href}
               href={l.href}
               className="relative text-[12px] font-medium uppercase tracking-[0.16em] text-white/70 transition-colors hover:text-gold after:absolute after:-bottom-1.5 after:left-1/2 after:h-px after:w-0 after:bg-gold after:transition-all after:duration-300 hover:after:left-0 hover:after:w-full"
             >
               {l.label}
-            </a>
+            </Link>
           ))}
         </nav>
         <div className="flex items-center gap-3">
-          <a
+          <Link
             href="/account"
-            className="hidden text-[12px] font-medium uppercase tracking-[0.16em] text-white/70 transition-colors hover:text-gold md:inline-flex"
+            className="hidden text-[12px] font-medium uppercase tracking-[0.16em] text-white/70 transition-colors hover:text-gold lg:inline-flex"
           >
             My Account
-          </a>
+          </Link>
           <Button
             asChild
-            className="hidden rounded-none border border-gold bg-transparent px-6 text-[12px] font-medium uppercase tracking-[0.18em] text-gold transition-all hover:bg-gold hover:text-royal-deep md:inline-flex"
+            className="hidden rounded-none border border-gold bg-transparent px-6 text-[12px] font-medium uppercase tracking-[0.18em] text-gold transition-all hover:bg-gold hover:text-royal-deep lg:inline-flex"
           >
-            <a href="#book">Book Now</a>
+            <Link href="/booking">Book Now</Link>
           </Button>
           <button
-            className="rounded-md border border-white/20 p-2 text-white md:hidden"
+            className="rounded-md border border-white/20 p-2.5 text-white lg:hidden"
             onClick={() => setOpen((v) => !v)}
             aria-label="Toggle menu"
             aria-expanded={open}
@@ -78,32 +79,32 @@ export function Nav() {
         </div>
       </div>
       {open && (
-        <div className="border-t border-gold/20 bg-royal-deep md:hidden">
+        <div className="border-t border-gold/20 bg-royal-deep lg:hidden">
           <div className="mx-auto flex max-w-7xl flex-col px-5 py-3">
             {NAV_LINKS.map((l) => (
-              <a
+              <Link
                 key={l.href}
                 href={l.href}
                 onClick={() => setOpen(false)}
                 className="py-2 text-sm font-medium uppercase tracking-[0.14em] text-white/80 hover:text-gold"
               >
                 {l.label}
-              </a>
+              </Link>
             ))}
-            <a
+            <Link
               href="/account"
               onClick={() => setOpen(false)}
               className="py-2 text-sm font-medium uppercase tracking-[0.14em] text-white/80 hover:text-gold"
             >
               My Account
-            </a>
-            <a
-              href="#book"
+            </Link>
+            <Link
+              href="/booking"
               onClick={() => setOpen(false)}
               className="mt-3 inline-flex items-center justify-center border border-gold px-6 py-2.5 text-[12px] font-medium uppercase tracking-[0.18em] text-gold hover:bg-gold hover:text-royal-deep"
             >
               Reserve · Book Now
-            </a>
+            </Link>
           </div>
         </div>
       )}

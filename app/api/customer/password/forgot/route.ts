@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
-import { sql, friendlyDbError } from "@/lib/db";
+import { db } from "@/lib/db";
+import { customers, passwordResetTokens } from "@/lib/db/schema";
+import { eq, sql } from "drizzle-orm";
+import { friendlyDbError } from "@/lib/db";
 import { randomBytes, createHash } from "crypto";
 import { normalizeEmail } from "@/lib/customer-auth";
 import { sendPasswordResetEmail } from "@/lib/mailer";
@@ -21,22 +24,33 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Please enter your email address." }, { status: 400 });
     }
 
-    const rows = await sql`SELECT id, full_name FROM customers WHERE email = ${email} LIMIT 1`;
+    const rows = await db
+      .select({ id: customers.id, fullName: customers.fullName })
+      .from(customers)
+      .where(eq(customers.email, email))
+      .limit(1);
 
     if (rows.length > 0) {
       const token = randomBytes(32).toString("hex");
       const tokenHash = createHash("sha256").update(token).digest("hex");
 
       // Invalidate previous outstanding tokens, then store the new one.
-      await sql`UPDATE password_reset_tokens SET used = true WHERE customer_id = ${rows[0].id}::uuid AND used = false`;
-      await sql`
-        INSERT INTO password_reset_tokens (token_hash, customer_id, expires_at)
-        VALUES (${tokenHash}, ${rows[0].id}::uuid, NOW() + INTERVAL '1 hour')
-      `;
+      await db
+        .update(passwordResetTokens)
+        .set({ used: 1 })
+        .where(
+          sql`${passwordResetTokens.customerId} = ${Number(rows[0].id)} AND ${passwordResetTokens.used} = 0`
+        );
+
+      await db.insert(passwordResetTokens).values({
+        tokenHash,
+        customerId: Number(rows[0].id),
+        expiresAt: sql`DATE_ADD(NOW(), INTERVAL 1 HOUR)`,
+      });
 
       const link = `${APP_URL}/reset-password?token=${token}`;
       try {
-        await sendPasswordResetEmail(email, rows[0].full_name, link);
+        await sendPasswordResetEmail(email, rows[0].fullName as string, link);
       } catch (mailErr) {
         console.error("[password/forgot] email send failed:", mailErr);
       }

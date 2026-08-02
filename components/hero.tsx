@@ -30,7 +30,7 @@ export function Hero() {
               size="lg"
               className="rounded-full bg-gold px-7 text-royal-deep hover:bg-gold-soft"
             >
-              <a href="#book">
+              <a href="/booking">
                 Book Now <ArrowRight className="ml-1 h-4 w-4" aria-hidden="true" />
               </a>
             </Button>

@@ -80,7 +80,7 @@ export function Pricing() {
                 className="mt-8 w-full rounded-full bg-royal text-primary-foreground hover:bg-royal-deep"
                 size="lg"
               >
-                <a href="#book">Reserve your date</a>
+                <a href="/booking">Reserve your date</a>
               </Button>
               <p className="mt-3 flex items-center justify-center gap-2 text-[11px] text-muted-foreground">
                 <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" /> Secure payment via Paystack / Flutterwave · All prices ex. VAT (7.5% VAT applies)

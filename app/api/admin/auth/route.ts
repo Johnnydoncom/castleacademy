@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { signToken, clearSessionCookie } from "@/lib/auth";
-import { sql } from "@/lib/db";
+import { db } from "@/lib/db";
+import { admins } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 
 const COOKIE_NAME = "admin_session";
@@ -18,14 +20,18 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Missing credentials" }, { status: 400 });
     }
 
-    const rows = await sql`SELECT id, password_hash FROM admins WHERE username = ${username} LIMIT 1`;
+    const rows = await db
+      .select({ id: admins.id, passwordHash: admins.passwordHash })
+      .from(admins)
+      .where(eq(admins.username, username))
+      .limit(1);
     
     if (rows.length === 0) {
       return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
     }
 
     const admin = rows[0];
-    const match = await bcrypt.compare(password, admin.password_hash);
+    const match = await bcrypt.compare(password, String(admin.passwordHash));
 
     if (!match) {
       return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });

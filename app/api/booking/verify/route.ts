@@ -1,14 +1,12 @@
 import { NextResponse } from "next/server";
-import { sql } from "@/lib/db";
+import { db } from "@/lib/db";
+import { bookings } from "@/lib/db/schema";
+import { eq, sql } from "drizzle-orm";
 import { verifyTransaction } from "@/lib/nomba";
 
 /**
  * POST /api/booking/verify
  * Called by the /booking/callback page to actively verify payment status.
- * This is the primary escape hatch: if the Nomba webhook is delayed/missed,
- * the callback page calls this endpoint which polls Nomba directly and
- * confirms the booking if the payment succeeded.
- *
  * Body: { ref: "CA-YYYYMMDD-XXXXXX" }
  */
 export async function POST(req: Request) {
@@ -20,17 +18,26 @@ export async function POST(req: Request) {
     }
 
     // 1. Fetch booking with payment details
-    const rows = await sql`
-      SELECT
-        id, reference, email, full_name,
-        start_date::text, end_date::text,
-        start_time::text, end_time::text,
-        status, payment_status, invoice_total,
-        nomba_order_ref, nomba_transaction_id, checkout_link
-      FROM bookings
-      WHERE reference = ${ref}
-      LIMIT 1
-    `;
+    const rows = await db
+      .select({
+        id: bookings.id,
+        reference: bookings.reference,
+        email: bookings.email,
+        full_name: bookings.fullName,
+        start_date: bookings.startDate,
+        end_date: bookings.endDate,
+        start_time: bookings.startTime,
+        end_time: bookings.endTime,
+        status: bookings.status,
+        payment_status: bookings.paymentStatus,
+        invoice_total: bookings.invoiceTotal,
+        nomba_order_ref: bookings.nombaOrderRef,
+        nomba_transaction_id: bookings.nombaTransactionId,
+        checkout_link: bookings.checkoutLink,
+      })
+      .from(bookings)
+      .where(eq(bookings.reference, ref))
+      .limit(1);
 
     if (rows.length === 0) {
       return NextResponse.json({ error: "Booking not found" }, { status: 404 });
@@ -56,7 +63,7 @@ export async function POST(req: Request) {
     let paymentMethod = "card";
 
     try {
-      const verification = await verifyTransaction(orderRef, txId);
+      const verification = await verifyTransaction(orderRef as string, txId as string | undefined);
       console.log(`[api/booking/verify] Nomba verify for ${ref}: success=${verification.success}, status=${verification.statusCode}`);
 
       if (verification.success) {
@@ -65,14 +72,15 @@ export async function POST(req: Request) {
       }
     } catch (verifyErr) {
       console.warn(`[api/booking/verify] Verify threw for ${ref}:`, verifyErr);
-      // On sandbox, don't fail — the webhook may have already fired
     }
 
     // 4. If sandbox and webhook has already confirmed it, re-fetch
     if (isSandbox && !paymentConfirmed) {
-      const recheck = await sql`
-        SELECT status, payment_status FROM bookings WHERE reference = ${ref} LIMIT 1
-      `;
+      const recheck = await db
+        .select({ status: bookings.status, payment_status: bookings.paymentStatus })
+        .from(bookings)
+        .where(eq(bookings.reference, ref))
+        .limit(1);
       if (recheck[0]?.payment_status === "paid") {
         return NextResponse.json({ status: "confirmed", paymentStatus: "paid", reference: ref });
       }
@@ -80,15 +88,16 @@ export async function POST(req: Request) {
 
     // 5. If confirmed, update the DB
     if (paymentConfirmed) {
-      await sql`
-        UPDATE bookings SET
-          status               = 'confirmed',
-          payment_status       = 'paid',
-          payment_method       = ${paymentMethod},
-          paid_at              = NOW(),
-          updated_at           = NOW()
-        WHERE reference = ${ref}
-      `;
+      await db
+        .update(bookings)
+        .set({
+          status: "confirmed",
+          paymentStatus: "paid",
+          paymentMethod,
+          paidAt: sql`NOW()`,
+          updatedAt: sql`NOW()`,
+        })
+        .where(eq(bookings.reference, ref));
 
       console.log(`[api/booking/verify] ✅ Booking ${ref} confirmed via active verify`);
 

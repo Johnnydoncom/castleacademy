@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { CANCELLATION_SUMMARY_TEXT } from "@/lib/policy";
@@ -30,6 +30,23 @@ const EVENT_TYPE_MAP: Record<string, string> = {
 };
 
 export default function BookingCallbackPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-[#f5f3ee] flex items-center justify-center px-4">
+          <div className="text-center space-y-4">
+            <div className="w-12 h-12 border-4 border-[#c9a84c] border-t-transparent rounded-full animate-spin mx-auto" />
+            <p className="text-[#0d0d0d] font-medium text-sm">Checking payment status…</p>
+          </div>
+        </div>
+      }
+    >
+      <BookingCallbackContent />
+    </Suspense>
+  );
+}
+
+function BookingCallbackContent() {
   const searchParams = useSearchParams();
   const ref = searchParams.get("ref");
 

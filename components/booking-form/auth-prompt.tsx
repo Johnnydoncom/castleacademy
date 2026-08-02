@@ -190,7 +190,7 @@ export function AuthPrompt({ customer, onAuthSuccess, onSignOut }: AuthPromptPro
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-6 md:p-8 space-y-5 border border-border relative">
-            
+
             {/* Close Button */}
             <button
               type="button"

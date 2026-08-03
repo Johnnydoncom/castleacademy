@@ -13,10 +13,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Field } from "@/components/field";
 import { TimePicker } from "@/components/ui/time-picker";
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import { useAvailability } from "@/components/booking-form/use-availability";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -661,15 +660,77 @@ function StatChip({ label, value, accent, className }: { label: string; value: s
 
 // ─── Reschedule dialog ────────────────────────────────────────────────────────
 
+// ─── Reschedule dialog ────────────────────────────────────────────────────────
+
 function RescheduleDialog({ booking, onDone }: { booking: Booking; onDone: () => void }) {
   const [open, setOpen] = useState(false);
   const [date, setDate] = useState("");
   const [startTime, setStartTime] = useState("");
-  const [endTime, setEndTime] = useState("");
   const [reason, setReason] = useState("");
   const [saving, setSaving] = useState(false);
 
+  // Time parsing & duration helpers
+  const parseMins = (t: string): number => {
+    const [h, m] = String(t).slice(0, 5).split(":").map(Number);
+    return (h || 0) * 60 + (m || 0);
+  };
+  const formatMins = (totalMins: number): string => {
+    const h = Math.floor(totalMins / 60);
+    const m = totalMins % 60;
+    return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+  };
+
+  const origStartMins = parseMins(booking.start_time);
+  const origEndMins = parseMins(booking.end_time);
+  const durationMins = Math.max(30, origEndMins - origStartMins);
+  const durationHours = (durationMins / 60).toFixed(1).replace(/\.0$/, "");
+
+  // Auto-calculated end time based on selected start time & fixed original duration
+  const endTime = startTime ? formatMins(parseMins(startTime) + durationMins) : "";
+
+  // 7-day policy check
+  const origDateStr = booking.start_date.slice(0, 10);
+  const eventDate = new Date(origDateStr + "T00:00:00");
+  const daysUntil = Math.floor((eventDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+  const isEligible = daysUntil >= 7;
+
+  // Live availability for selected date
+  const datesArray = date ? [date] : [];
+  const availability = useAvailability(datesArray);
+
+  const window = date ? availability.windowFor(date) : null;
+  const busySlots = date ? availability.busyFor(date) : [];
+  const isClosed = date && availability.status === "ready" && (!window || availability.closedDates.includes(date));
+
+  // Capped max start time so that startTime + durationMins fits within closing hours
+  const maxStartTime = window?.closeTime
+    ? formatMins(parseMins(window.closeTime) - durationMins)
+    : undefined;
+
+  // Check if requested [startTime, endTime] overlaps with busy slots
+  const hasConflict = Boolean(
+    date &&
+      startTime &&
+      endTime &&
+      busySlots.some((s) => startTime < s.endTime && endTime > s.startTime)
+  );
+
+  // Minimum selectable new date (at least 8 days from today for 7+ day policy)
+  const minNewDate = new Date(Date.now() + 8 * 864e5).toISOString().slice(0, 10);
+
+  const resetForm = () => {
+    setDate("");
+    setStartTime("");
+    setReason("");
+  };
+
+  const handleOpenChange = (isOpen: boolean) => {
+    setOpen(isOpen);
+    if (!isOpen) resetForm();
+  };
+
   const submit = async () => {
+    if (!date || !startTime || !endTime) return;
     setSaving(true);
     try {
       const res = await fetch(`/api/customer/bookings/${booking.reference}`, {
@@ -679,16 +740,21 @@ function RescheduleDialog({ booking, onDone }: { booking: Booking; onDone: () =>
       });
       const d = await res.json();
       if (!res.ok) throw new Error(d.error);
-      toast.success(d.message || "Reschedule requested");
+      toast.success(d.message || "Reschedule request submitted!");
       setOpen(false);
+      resetForm();
       onDone();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Failed");
-    } finally { setSaving(false); }
+      toast.error(e instanceof Error ? e.message : "Failed to submit reschedule");
+    } finally {
+      setSaving(false);
+    }
   };
 
+  const isMultiDay = booking.start_date !== booking.end_date;
+
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <Button
         size="sm"
         variant="outline"
@@ -699,47 +765,157 @@ function RescheduleDialog({ booking, onDone }: { booking: Booking; onDone: () =>
       </Button>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Request a reschedule</DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            <RefreshCw className="h-5 w-5 text-gold" /> Request a reschedule
+          </DialogTitle>
         </DialogHeader>
-        <p className="text-sm text-muted-foreground">
-          Free rescheduling is available more than 7 days before your event. We&apos;ll review and confirm your new slot within 24 hours.
-        </p>
-        <div className="space-y-3">
-          <Field label="New date">
-            <Input
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              min={new Date(Date.now() + 8 * 864e5).toISOString().slice(0, 10)}
-            />
-          </Field>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Start time">
-              <TimePicker value={startTime} onChange={setStartTime} placeholder="Start" />
-            </Field>
-            <Field label="End time">
-              <TimePicker value={endTime} onChange={setEndTime} placeholder="End" />
-            </Field>
+
+        {/* ── Policy check: < 7 days out ── */}
+        {!isEligible ? (
+          <div className="space-y-4">
+            <div className="rounded-xl border border-red-200 bg-red-50 p-4 space-y-2">
+              <div className="flex items-center gap-2 text-red-700 font-semibold text-sm">
+                <AlertTriangle className="h-4 w-4 shrink-0" />
+                Reschedule Policy Notice
+              </div>
+              <p className="text-xs text-red-800 leading-relaxed">
+                Free online rescheduling is only available more than <strong>7 days</strong> before your scheduled event date ({fmtDate(booking.start_date)}).
+              </p>
+              <p className="text-xs text-red-700 leading-relaxed">
+                Since your event is within 7 days, please contact our support team directly to request a manual schedule adjustment.
+              </p>
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <a
+                href={`https://wa.me/2349042222296?text=Hi, I need to reschedule my booking ${booking.reference} scheduled for ${booking.start_date}.`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-1"
+              >
+                <Button className="w-full bg-[#25d366] text-white hover:bg-[#20b858] gap-1.5 rounded-full text-xs font-semibold">
+                  Contact on WhatsApp
+                </Button>
+              </a>
+              <Button variant="outline" className="rounded-full text-xs" onClick={() => setOpen(false)}>
+                Close
+              </Button>
+            </div>
           </div>
-          <Field label="Reason" hint="optional">
-            <Input
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              placeholder="e.g. schedule clash"
-            />
-          </Field>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-          <Button
-            className="bg-gold text-royal-deep hover:bg-gold-soft"
-            disabled={saving || !date || !startTime || !endTime}
-            onClick={submit}
-          >
-            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Submit request"}
-          </Button>
-        </DialogFooter>
+        ) : (
+          /* ── Eligible for Reschedule (>= 7 days out) ── */
+          <div className="space-y-4">
+            {/* Original Booking Summary Card */}
+            <div className="rounded-xl border border-border bg-ivory/60 p-3 text-xs space-y-1.5">
+              <div className="flex justify-between text-muted-foreground">
+                <span>Current Slot:</span>
+                <span className="font-semibold text-foreground">{fmtDate(booking.start_date)}</span>
+              </div>
+              <div className="flex justify-between text-muted-foreground">
+                <span>Original Time:</span>
+                <span className="font-semibold text-foreground">
+                  {t5(booking.start_time)} – {t5(booking.end_time)} ({durationHours} hrs)
+                </span>
+              </div>
+            </div>
+
+            {isMultiDay && (
+              <div className="rounded-lg border border-blue-200 bg-blue-50 p-2.5 text-[11px] leading-relaxed text-blue-800">
+                ℹ️ This booking spans multiple days. Rescheduling updates your start date while preserving your original booking duration.
+              </div>
+            )}
+
+            <div className="space-y-3">
+              {/* New Date */}
+              <Field label="New date" hint="min 8 days ahead">
+                <Input
+                  type="date"
+                  value={date}
+                  onChange={(e) => {
+                    setDate(e.target.value);
+                    setStartTime("");
+                  }}
+                  min={minNewDate}
+                />
+              </Field>
+
+              {/* Start Time & End Time */}
+              {date && (
+                <div className="space-y-3">
+                  {isClosed ? (
+                    <p className="rounded-lg bg-red-50 border border-red-200 p-2.5 text-xs text-red-600 font-medium">
+                      The venue is closed on {fmtDate(date)}. Please pick a different date.
+                    </p>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-3">
+                      <Field label="Start time">
+                        <TimePicker
+                          value={startTime}
+                          onChange={setStartTime}
+                          placeholder="Select start"
+                          minTime={window?.openTime}
+                          maxTime={maxStartTime}
+                          busySlots={busySlots}
+                          disabledHint={
+                            window
+                              ? `Open ${window.openTime}–${window.closeTime}. Max start: ${maxStartTime}`
+                              : undefined
+                          }
+                        />
+                      </Field>
+
+                      <Field label="End time" hint={`locked (${durationHours} hrs)`}>
+                        <div className="flex h-12 w-full items-center justify-between rounded-md border border-input bg-muted/30 px-3 py-2 text-sm text-foreground font-mono font-medium">
+                          <span>{endTime ? displayTimeHelper(endTime) : "—:—"}</span>
+                          <Clock className="h-4 w-4 text-muted-foreground opacity-50" />
+                        </div>
+                      </Field>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Conflict warning */}
+              {hasConflict && (
+                <p className="rounded-lg bg-amber-50 border border-amber-200 p-2.5 text-xs text-amber-800">
+                  ⚠️ The requested time ({startTime}–{endTime}) overlaps with an existing booking or venue break. Please pick another start time.
+                </p>
+              )}
+
+              {/* Optional Reason */}
+              <Field label="Reason for reschedule" hint="optional">
+                <Input
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  placeholder="e.g. Schedule conflict"
+                />
+              </Field>
+            </div>
+
+            <DialogFooter className="gap-2 pt-2">
+              <Button variant="outline" className="rounded-full" onClick={() => setOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                className="bg-gold text-royal-deep hover:bg-gold-soft rounded-full font-semibold"
+                disabled={saving || !date || !startTime || !endTime || isClosed || hasConflict}
+                onClick={submit}
+              >
+                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Submit reschedule request"}
+              </Button>
+            </DialogFooter>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );
+}
+
+function displayTimeHelper(val: string): string {
+  if (!val) return "";
+  const [hRaw, mRaw] = val.split(":");
+  const h24 = parseInt(hRaw, 10);
+  const period = h24 >= 12 ? "PM" : "AM";
+  const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
+  return `${String(h12).padStart(2, "0")}:${mRaw} ${period}`;
 }

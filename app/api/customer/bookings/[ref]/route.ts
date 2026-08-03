@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { bookings } from "@/lib/db/schema";
-import { eq, sql } from "drizzle-orm";
+import { bookings, venueHours, bookingDays, blockedSlots } from "@/lib/db/schema";
+import { eq, and, or, ne, sql } from "drizzle-orm";
 import { getCustomerSession } from "@/lib/customer-auth";
 import { resendInvoiceEmail, resendReceiptEmail, notifyAdminReschedule } from "@/lib/mailer";
 import { createCheckoutOrder } from "@/lib/nomba";
@@ -9,6 +9,11 @@ import type { InvoiceBooking } from "@/lib/invoice";
 
 const REF_RE = /^CA-\d{8}-[A-F0-9]{6}$/;
 const APP_URL = process.env.APP_URL || "https://thecastleacademy.com";
+
+function parseMinutes(timeStr: string): number {
+  const [h, m] = String(timeStr).slice(0, 5).split(":").map(Number);
+  return (h || 0) * 60 + (m || 0);
+}
 
 async function loadOwnedBooking(ref: string, session: { id: string; email: string }) {
   const rows = await db
@@ -129,7 +134,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ ref: st
       const reason = body.reason ? String(body.reason).trim() : null;
 
       if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !startTime || !endTime) {
-        return NextResponse.json({ error: "Please provide a valid new date, start and end time." }, { status: 400 });
+        return NextResponse.json({ error: "Please provide a valid new date, start time, and end time." }, { status: 400 });
       }
       if (endTime <= startTime) {
         return NextResponse.json({ error: "End time must be after start time." }, { status: 400 });
@@ -141,14 +146,89 @@ export async function POST(req: Request, { params }: { params: Promise<{ ref: st
         return NextResponse.json({ error: "A reschedule request is already pending review." }, { status: 409 });
       }
 
-      // Policy: free rescheduling only when more than 7 days before the event.
-      const eventDate = new Date(booking.startDate + "T00:00:00");
+      // 1. Policy: free rescheduling only when more than 7 days before event.
+      const startDateStr = booking.startDate instanceof Date
+        ? booking.startDate.toISOString().slice(0, 10)
+        : String(booking.startDate).slice(0, 10);
+
+      const eventDate = new Date(startDateStr + "T00:00:00");
       const daysUntil = Math.floor((eventDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
       if (daysUntil < 7) {
         return NextResponse.json(
-          { error: "Reschedules must be requested more than 7 days before the event. Please contact us directly." },
+          { error: "Reschedules must be requested more than 7 days before the event. Please contact us directly on WhatsApp." },
           { status: 400 }
         );
+      }
+
+      // 2. Strict duration matching: user cannot extend duration beyond original booking.
+      const origMins = parseMinutes(String(booking.endTime)) - parseMinutes(String(booking.startTime));
+      const reqMins = parseMinutes(endTime) - parseMinutes(startTime);
+      if (reqMins !== origMins) {
+        return NextResponse.json(
+          { error: `Requested slot duration (${reqMins / 60} hrs) must match original booking duration (${origMins / 60} hrs).` },
+          { status: 400 }
+        );
+      }
+
+      // 3. Venue opening hours check
+      const [y, m, d] = date.split("-").map(Number);
+      const dow = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+      const hoursRows = await db
+        .select()
+        .from(venueHours)
+        .where(eq(venueHours.dayOfWeek, dow))
+        .limit(1);
+
+      if (hoursRows.length > 0) {
+        const vh = hoursRows[0];
+        if (!vh.isOpen) {
+          return NextResponse.json({ error: "The venue is closed on the selected date." }, { status: 400 });
+        }
+        const openStr = String(vh.openTime).slice(0, 5);
+        const closeStr = String(vh.closeTime).slice(0, 5);
+        if (startTime < openStr || endTime > closeStr) {
+          return NextResponse.json({ error: `Selected time is outside venue hours (${openStr} – ${closeStr}).` }, { status: 400 });
+        }
+      }
+
+      // 4. Overlap & availability check against existing bookings and blocked slots
+      const existingBooked = await db
+        .select({
+          startTime: bookingDays.startTime,
+          endTime: bookingDays.endTime,
+        })
+        .from(bookingDays)
+        .innerJoin(bookings, eq(bookings.id, bookingDays.bookingId))
+        .where(
+          and(
+            eq(bookingDays.dayDate, date as any),
+            ne(bookings.id, booking.id),
+            or(
+              eq(bookings.status, "confirmed"),
+              and(
+                eq(bookings.status, "pending"),
+                sql`${bookings.createdAt} > DATE_SUB(NOW(), INTERVAL 6 HOUR)`
+              )
+            )
+          )
+        );
+
+      const existingBlocked = await db
+        .select({
+          startTime: blockedSlots.startTime,
+          endTime: blockedSlots.endTime,
+        })
+        .from(blockedSlots)
+        .where(eq(blockedSlots.slotDate, date as any));
+
+      const isOverlap = [...existingBooked, ...existingBlocked].some((slot) => {
+        const sStart = String(slot.startTime).slice(0, 5);
+        const sEnd = String(slot.endTime).slice(0, 5);
+        return startTime < sEnd && endTime > sStart;
+      });
+
+      if (isOverlap) {
+        return NextResponse.json({ error: "The requested time slot conflicts with an existing booking or blocked hours." }, { status: 400 });
       }
 
       await db

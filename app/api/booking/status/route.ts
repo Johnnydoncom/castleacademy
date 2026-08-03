@@ -42,8 +42,26 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "Booking not found" }, { status: 404 });
     }
 
-    // Return flat object — the callback page reads this directly as BookingStatus
-    return NextResponse.json(rows[0]);
+    const row = rows[0];
+
+    // Drizzle returns MySQL `date` columns as JS Date objects.
+    // Serialise them to plain YYYY-MM-DD strings so the client can safely
+    // pass them to `new Date("YYYY-MM-DD")` without timezone-shift surprises.
+    const toDateStr = (v: unknown): string => {
+      if (!v) return "";
+      if (v instanceof Date) return v.toISOString().slice(0, 10);
+      const s = String(v);
+      // Already a YYYY-MM-DD string — return as-is
+      if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+      // ISO datetime string — trim to date portion
+      return s.slice(0, 10);
+    };
+
+    return NextResponse.json({
+      ...row,
+      startDate: toDateStr(row.startDate),
+      endDate: toDateStr(row.endDate),
+    });
   } catch (err) {
     console.error("[booking/status] error:", err);
     return NextResponse.json({ error: "Failed to fetch booking status" }, { status: 500 });

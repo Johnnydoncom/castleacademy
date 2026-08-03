@@ -138,16 +138,27 @@ function BookingCallbackContent() {
     return () => clearTimeout(timer);
   }, [booking, pollCount, checkStatus]);
 
-  const formatDate = (date: string) => {
+  const formatDate = (date: string | Date | unknown) => {
     try {
-      return new Date(date + "T00:00:00").toLocaleDateString("en-NG", {
+      let dateStr: string;
+      if (date instanceof Date) {
+        // Already a Date object — format directly
+        return date.toLocaleDateString("en-NG", {
+          weekday: "short", year: "numeric", month: "long", day: "numeric",
+        });
+      }
+      dateStr = String(date ?? "");
+      // Trim to YYYY-MM-DD if we received a full ISO string
+      if (dateStr.length > 10) dateStr = dateStr.slice(0, 10);
+      // Parse as local midnight to avoid UTC timezone-shift off-by-one
+      return new Date(dateStr + "T00:00:00").toLocaleDateString("en-NG", {
         weekday: "short",
         year: "numeric",
         month: "long",
         day: "numeric",
       });
     } catch {
-      return date;
+      return String(date ?? "");
     }
   };
 

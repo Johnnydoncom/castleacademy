@@ -21,7 +21,18 @@ const globalForDb = globalThis as unknown as {
   pool: mysql.Pool | undefined;
 };
 
-const pool = globalForDb.pool ?? mysql.createPool(process.env.DATABASE_URL);
+const pool =
+  globalForDb.pool ??
+  mysql.createPool({
+    uri: process.env.DATABASE_URL,
+    waitForConnections: true,
+    connectionLimit: 10,
+    maxIdle: 10,
+    idleTimeout: 60000,
+    enableKeepAlive: true,
+    keepAliveInitialDelay: 10000,
+  });
+
 if (process.env.NODE_ENV !== "production") globalForDb.pool = pool;
 
 export const db = drizzle({ client: pool, schema, mode: "default" } as any);
@@ -32,7 +43,7 @@ export const db = drizzle({ client: pool, schema, mode: "default" } as any);
  */
 export function friendlyDbError(err: unknown): string | null {
   if (!err || typeof err !== "object") return null;
-  const code = (err as any).code as string | undefined;
+  const code = ((err as any).code || (err as any).cause?.code) as string | undefined;
   switch (code) {
     case "ER_DUP_ENTRY":
       return "A record with those details already exists.";
@@ -41,9 +52,12 @@ export function friendlyDbError(err: unknown): string | null {
       return "Referenced record not found.";
     case "ER_DATA_TOO_LONG":
       return "One of the values is too long.";
+    case "ECONNRESET":
+    case "PROTOCOL_CONNECTION_LOST":
+    case "ETIMEDOUT":
     case "ECONNREFUSED":
     case "ENOTFOUND":
-      return "Database is unreachable. Please try again later.";
+      return "Database connection was reset. Please try again.";
     default:
       return null;
   }

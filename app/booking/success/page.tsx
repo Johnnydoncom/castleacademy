@@ -109,8 +109,16 @@ function BookingSuccessContent() {
     }
   };
 
-  const formatDate = (dateStr: string) => {
+  const formatDate = (dateVal: string | Date | unknown) => {
     try {
+      if (dateVal instanceof Date) {
+        return dateVal.toLocaleDateString("en-NG", {
+          weekday: "short", year: "numeric", month: "long", day: "numeric",
+        });
+      }
+      let dateStr = String(dateVal ?? "");
+      // Trim to YYYY-MM-DD if we received a full ISO string e.g. "2026-08-03T00:00:00.000Z"
+      if (dateStr.length > 10) dateStr = dateStr.slice(0, 10);
       return new Date(dateStr + "T00:00:00").toLocaleDateString("en-NG", {
         weekday: "short",
         year: "numeric",
@@ -118,7 +126,7 @@ function BookingSuccessContent() {
         day: "numeric",
       });
     } catch {
-      return dateStr;
+      return String(dateVal ?? "");
     }
   };
 

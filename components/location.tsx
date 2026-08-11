@@ -30,8 +30,8 @@ export function Location() {
             </div>
             <div className="flex items-start gap-3">
               <Mail className="mt-0.5 h-4 w-4 text-gold flex-shrink-0" aria-hidden="true" />
-              <a href="mailto:bookings@castleacademy.ng" className="hover:text-gold transition-colors">
-                bookings@castleacademy.ng
+              <a href="mailto:bookings@thecastleacademy.com" className="hover:text-gold transition-colors">
+                bookings@thecastleacademy.com
               </a>
             </div>
           </address>

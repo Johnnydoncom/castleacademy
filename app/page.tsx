@@ -59,7 +59,7 @@ export default function Page() {
       ],
       priceRange: "₦₦",
       currenciesAccepted: "NGN",
-      paymentAccepted: "Paystack, Flutterwave",
+      paymentAccepted: "Nomba",
       amenityFeature: [
         { "@type": "LocationFeatureSpecification", name: "Smart TV (4K)", value: true },
         { "@type": "LocationFeatureSpecification", name: "High-Speed Wi-Fi", value: true },

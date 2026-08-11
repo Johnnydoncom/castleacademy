@@ -6,13 +6,13 @@ export function BookingBanner() {
   return (
     <section id="book" className="bg-ivory py-20 md:py-28" aria-labelledby="booking-banner-heading">
       <div className="mx-auto max-w-6xl px-5 md:px-8">
-        
+
         <div className="relative overflow-hidden rounded-3xl bg-royal p-8 text-white md:p-14 shadow-2xl shadow-royal/20 border border-white/10">
           <div className="grain absolute inset-0 opacity-30" />
           <div className="absolute -right-20 -bottom-20 w-80 h-80 rounded-full bg-gold/15 blur-3xl pointer-events-none" />
-          
+
           <div className="relative grid gap-10 lg:grid-cols-[1.2fr_0.8fr] lg:items-center">
-            
+
             {/* Left Content Column */}
             <div className="space-y-6">
               <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3.5 py-1 text-xs font-medium uppercase tracking-[0.18em] text-gold-soft">
@@ -69,7 +69,7 @@ export function BookingBanner() {
               </div>
 
               <p className="flex items-center gap-2 text-xs text-white/60 pt-2">
-                <ShieldCheck className="w-4 h-4 text-gold shrink-0" /> Secure payment via Paystack &amp; Flutterwave · 7.5% VAT applies
+                <ShieldCheck className="w-4 h-4 text-gold shrink-0" /> Secure payment via Nomba · 7.5% VAT applies
               </p>
             </div>
 

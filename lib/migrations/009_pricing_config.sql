@@ -51,7 +51,7 @@ INSERT INTO pricing_config (id, config) VALUES (1, '{
   "manualNotes": [
     "Loyalty: 10% off the 6th booking after 5; a complimentary 3-hour session after 10.",
     "Corporate membership: Silver 5%, Gold 10%, Platinum 15%.",
-    "Referral: the referrer receives 10,000 credit or one free extra hour.",
+    "Referral: the referrer earns 5% commission on the booking they refer.",
     "Weekly bookings: custom corporate pricing on request."
   ]
 }'::jsonb)

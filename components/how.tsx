@@ -1,7 +1,7 @@
 const STEPS = [
   { n: "01", title: "Pick your date & time", body: "Choose a preferred day and window from our live calendar." },
   { n: "02", title: "Fill in your event details", body: "Tell us who you are, what you're hosting and how many are coming." },
-  { n: "03", title: "Get instant confirmation", body: "Receive booking confirmation and secure payment instructions via Paystack or Flutterwave." },
+  { n: "03", title: "Get instant confirmation", body: "Receive booking confirmation and secure payment instructions via Nomba." },
   { n: "04", title: "Walk in & enjoy", body: "Arrive to a room that's set up, powered, and ready — you just teach." },
 ];
 

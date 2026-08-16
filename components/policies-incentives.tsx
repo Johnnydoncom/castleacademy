@@ -29,7 +29,7 @@ export function PoliciesAndIncentives() {
             Policies, Rewards &amp; <span className="text-gold">Incentives</span>
           </h2>
           <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-            Clear cancellation terms, early booking savings, referral credits, and multi-day discounts for every client.
+            Clear cancellation terms, early booking savings, referral commission, and multi-day discounts for every client.
           </p>
         </div>
 
@@ -66,7 +66,7 @@ export function PoliciesAndIncentives() {
               </div>
               <h3 className="font-display text-xl text-ink font-bold">Referral Rewards</h3>
               <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-                Refer an organization or colleague to Castle Academy. When they book, you receive a <strong>₦10,000 credit</strong> toward your next booking OR <strong>1 Free Extra Hour</strong>.
+                Refer an organization or colleague to Castle Academy. When they book, you earn <strong>5% commission</strong> on their booking.
               </p>
             </div>
             <div className="mt-6 pt-4 border-t border-amber-100 flex items-center gap-2 text-xs font-medium text-amber-800">

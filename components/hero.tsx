@@ -46,7 +46,7 @@ export function Hero() {
           <div className="mt-10 flex flex-wrap items-center gap-x-6 gap-y-3 text-xs text-white/70">
             <span className="inline-flex items-center gap-2">
               <ShieldCheck className="h-4 w-4 text-gold" aria-hidden="true" /> Secure payment via
-              Paystack &amp; Flutterwave
+              Nomba
             </span>
             <span className="inline-flex items-center gap-2">
               <MessageCircle className="h-4 w-4 text-gold" aria-hidden="true" /> Instant WhatsApp

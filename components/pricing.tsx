@@ -13,8 +13,7 @@ export function Pricing() {
             One clear rate. No surprises at checkout.
           </h2>
           <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
-            Naira pricing. Instant confirmation. Pay securely via Paystack or
-            Flutterwave.
+            Naira pricing. Instant confirmation. Pay securely via Nomba.
           </p>
         </div>
 
@@ -83,7 +82,7 @@ export function Pricing() {
                 <a href="/booking">Reserve your date</a>
               </Button>
               <p className="mt-3 flex items-center justify-center gap-2 text-[11px] text-muted-foreground">
-                <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" /> Secure payment via Paystack / Flutterwave · All prices ex. VAT (7.5% VAT applies)
+                <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" /> Secure payment via Nomba · All prices ex. VAT (7.5% VAT applies)
               </p>
             </div>
           </div>
@@ -92,3 +91,4 @@ export function Pricing() {
     </section>
   );
 }
+

@@ -52,7 +52,7 @@ export const FAQ_ITEMS: FaqItemData[] = [
     iconName: "CreditCard",
     question: "What payment methods do you accept?",
     answer:
-      "Online payments. We support secure online transfers and card payments via Paystack and Flutterwave.",
+      "Online payments. We support secure online transfers and card payments via Nomba.",
   },
   {
     id: "parking-availability",
@@ -82,7 +82,7 @@ export const FAQ_ITEMS: FaqItemData[] = [
     iconName: "Sparkles",
     question: "How do Referral Rewards work?",
     answer:
-      "When you refer an organization or colleague to Castle Academy and they complete a booking, you receive a ₦10,000 credit toward your next booking OR 1 free extra hour.",
+      "When you refer an organization or colleague to Castle Academy and they complete a booking, you earn 5% commission on their booking.",
   },
   {
     id: "loyalty-discounts",

@@ -332,7 +332,7 @@ function BookingSuccessContent() {
               <Gift className="w-4 h-4 text-blue-700" /> Referral Rewards
             </div>
             <p className="text-xs text-blue-800/90 leading-relaxed">
-              Refer a friend or colleague and receive <strong>₦10,000 credit</strong> or <strong>1 free extra hour</strong>!
+              Refer a friend or colleague and earn <strong>5% commission</strong> on their booking!
             </p>
           </div>
 

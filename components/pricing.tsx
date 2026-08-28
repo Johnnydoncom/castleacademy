@@ -60,7 +60,7 @@ export function Pricing() {
               <h3 className="font-display text-2xl text-ink">Included with every booking</h3>
               <ul className="mt-6 space-y-3.5">
                 {[
-                  "Classroom setup for up to 24 participants",
+                  "Flexible training and event space",
                   "Smart TV, HDMI cables & wireless casting",
                   "High-speed fibre Wi-Fi for the whole room",
                   "Uninterrupted power (grid + inverter + generator)",

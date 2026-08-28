@@ -2,7 +2,7 @@ import { ArrowRight, Snowflake, Tv, Users, Volume2, Wand2, Wifi, Zap } from "luc
 import { cn } from "@/lib/utils";
 
 const FEATURES = [
-  { icon: Users, title: "Seats 24 comfortably", body: "Classroom-style setup with ergonomic chairs and generous writing space for every participant." },
+  { icon: Users, title: "Flexible training and event space", body: "Versatile layouts with ergonomic seating and generous desk space for every participant." },
   { icon: Tv, title: "Smart TV display", body: "Large 4K screen with HDMI, wireless casting and adjustable inputs for flawless presentations." },
   { icon: Wifi, title: "High-speed Wi-Fi", body: "Fibre-backed connectivity that keeps demos, video calls and live streams running smoothly." },
   { icon: Zap, title: "Uninterrupted power", body: "Grid + inverter + generator. Your session runs from start to finish, no matter what." },

@@ -75,7 +75,7 @@ export function Hero() {
             Available today · 9am – 6pm
           </div>
           <div className="absolute -top-4 right-4 rounded-xl bg-cream px-3 py-2 text-[11px] uppercase tracking-[0.14em] text-royal-deep shadow-lg ring-1 ring-royal-deep/10">
-            <span className="font-semibold">Seats 24</span> · Classroom setup
+            <span className="font-semibold">Flexible</span> training and event space.
           </div>
         </div>
       </div>

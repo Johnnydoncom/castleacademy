@@ -151,3 +151,22 @@ export function normalisePricingConfig(raw: unknown): PricingConfig {
       : d.manualNotes,
   };
 }
+
+/**
+ * Human wording for the multi-day tiers, e.g. "5% off 2 consecutive days ·
+ * 10% off 3–5 days". Shared by every surface that advertises the discount so
+ * the pricing section, the incentives cards and the FAQ cannot drift apart.
+ */
+export function describeMultiDayTiers(config: PricingConfig): string {
+  return [...config.multiDay]
+    .sort((a, b) => a.minDays - b.minDays)
+    .map(
+      (t) =>
+        `${t.percent}% off ${
+          t.minDays === t.maxDays
+            ? `${t.minDays} consecutive days`
+            : `${t.minDays}–${t.maxDays} days`
+        }`
+    )
+    .join(" · ");
+}

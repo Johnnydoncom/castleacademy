@@ -1,8 +1,14 @@
 import Link from "next/link";
 import { ArrowRight, Calendar, CheckCircle2, ShieldCheck, Clock, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { loadPricingConfig } from "@/lib/pricing-config-store";
+import { naira } from "@/lib/format-money";
 
-export function BookingBanner() {
+/** Rates read from `pricing_config` so this banner cannot advertise a stale price. */
+export async function BookingBanner() {
+  const { config } = await loadPricingConfig();
+  const { hours3, extraHour } = config.packages;
+
   return (
     <section id="book" className="bg-ivory py-20 md:py-28" aria-labelledby="booking-banner-heading">
       <div className="mx-auto max-w-6xl px-5 md:px-8">
@@ -69,7 +75,7 @@ export function BookingBanner() {
               </div>
 
               <p className="flex items-center gap-2 text-xs text-white/60 pt-2">
-                <ShieldCheck className="w-4 h-4 text-gold shrink-0" /> Secure payment via Nomba · 7.5% VAT applies
+                <ShieldCheck className="w-4 h-4 text-gold shrink-0" /> Secure payment via Nomba · {config.vatRate}% VAT applies
               </p>
             </div>
 
@@ -80,7 +86,7 @@ export function BookingBanner() {
                   <Calendar className="w-4 h-4" /> Standard Rate
                 </div>
                 <div className="flex items-baseline gap-2">
-                  <span className="font-display text-4xl md:text-5xl text-white font-bold">₦100,000</span>
+                  <span className="font-display text-4xl md:text-5xl text-white font-bold">{naira(hours3)}</span>
                   <span className="text-xs text-gold/80">(excl. VAT)</span>
                 </div>
                 <p className="text-xs text-white/70">For up to 3 hours of dedicated venue time</p>
@@ -91,7 +97,7 @@ export function BookingBanner() {
               <div className="space-y-3 text-xs text-white/80">
                 <div className="flex items-center justify-between">
                   <span className="text-white/60">Extra Hour</span>
-                  <span className="font-semibold text-gold">₦30,000 / hr</span>
+                  <span className="font-semibold text-gold">{naira(extraHour)} / hr</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-white/60">Capacity</span>

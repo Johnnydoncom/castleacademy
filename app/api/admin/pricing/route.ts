@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { isOwner, getAdminSession } from "@/lib/auth";
 import { loadPricingConfig, savePricingConfig } from "@/lib/pricing-config-store";
 
@@ -40,6 +41,11 @@ export async function PUT(req: Request) {
       (body as { config?: unknown })?.config ?? body,
       session?.username ?? "owner"
     );
+    // The marketing pages render these figures, so bust their cache now rather
+    // than leaving the site advertising the old rate until the next rebuild.
+    revalidatePath("/", "layout");
+    revalidatePath("/booking");
+
     return NextResponse.json({ success: true, config });
   } catch (err) {
     console.error("[API/admin/pricing] save failed:", err);

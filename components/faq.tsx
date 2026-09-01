@@ -42,13 +42,15 @@ const CATEGORIES = [
   { id: "rules", label: "Rules & Customization" },
 ] as const;
 
-export function Faq() {
+export function Faq({ items = FAQ_ITEMS }: { items?: FaqItemData[] }) {
+  // `items` comes from the server with configurable figures already filled in;
+  // the static list is only a fallback for callers that don't pass any.
   const [activeTab, setActiveTab] = useState<string>("all");
 
   const filteredFaqs =
     activeTab === "all"
-      ? FAQ_ITEMS
-      : FAQ_ITEMS.filter((item) => item.category === activeTab);
+      ? items
+      : items.filter((item) => item.category === activeTab);
 
   return (
     <section

@@ -1,3 +1,5 @@
+import { describeMultiDayTiers, type PricingConfig } from "./pricing-config";
+
 export interface FaqItemData {
   id: string;
   category: "booking" | "facility" | "rules";
@@ -93,3 +95,30 @@ export const FAQ_ITEMS: FaqItemData[] = [
       "Yes! Multi-day bookings receive 5% off for 2 consecutive days, and 10% off for 3–5 days. Repeat clients get 10% off their 6th booking after 5 bookings, and 1 complimentary 3-hour session after 10 bookings.",
   },
 ];
+
+/**
+ * FAQ answers with the configurable figures substituted from `pricing_config`.
+ *
+ * The early-booking and multi-day answers used to hardcode percentages, so an
+ * admin discount change left the FAQ — and the FAQPage structured data built
+ * from it — advertising terms the booking engine no longer applied.
+ */
+export function buildFaqItems(config: PricingConfig): FaqItemData[] {
+  const early = config.earlyBooking;
+
+  return FAQ_ITEMS.map((item) => {
+    if (item.id === "early-booking-incentive" && early.enabled) {
+      return {
+        ...item,
+        answer: `Yes! We offer a ${early.percent}% discount for bookings that are confirmed and paid at least ${early.minDaysAhead} days in advance.`,
+      };
+    }
+    if (item.id === "loyalty-discounts") {
+      return {
+        ...item,
+        answer: `Yes! Multi-day bookings receive ${describeMultiDayTiers(config)}. Repeat clients get 10% off their 6th booking after 5 bookings, and 1 complimentary 3-hour session after 10 bookings.`,
+      };
+    }
+    return item;
+  });
+}

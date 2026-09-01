@@ -1,7 +1,18 @@
 import { Button } from "@/components/ui/button";
 import { CheckCircle2, ShieldCheck, Star } from "lucide-react";
+import { loadPricingConfig } from "@/lib/pricing-config-store";
+import { naira } from "@/lib/format-money";
 
-export function Pricing() {
+/**
+ * Rates come from `pricing_config` — the same record the booking quote is
+ * calculated from and the owner edits at /admin/pricing. They used to be
+ * hardcoded here, so an admin price change updated what customers were charged
+ * while this section kept advertising the old figure.
+ */
+export async function Pricing() {
+  const { config } = await loadPricingConfig();
+  const { hours3, halfDay, fullDay, extraHour } = config.packages;
+
   return (
     <section id="pricing" className="bg-ivory py-20 md:py-28" aria-labelledby="pricing-heading">
       <div className="mx-auto max-w-6xl px-5 md:px-8">
@@ -27,7 +38,7 @@ export function Pricing() {
                 </div>
                 <div className="mt-8 flex items-baseline gap-2">
                   <span className="font-display text-5xl leading-none text-white md:text-6xl">
-                    ₦100,000
+                    {naira(hours3)}
                   </span>
                   <span className="text-sm font-medium text-gold/80">(exclusive of VAT)</span>
                 </div>
@@ -41,15 +52,16 @@ export function Pricing() {
                       Extra hour
                     </div>
                     <div className="mt-1 font-display text-2xl text-gold">
-                      ₦30,000 <span className="text-sm font-normal text-gold/70">(excl. VAT)</span>
+                      {naira(extraHour)}{" "}
+                      <span className="text-sm font-normal text-gold/70">(excl. VAT)</span>
                     </div>
                   </div>
                   <div className="text-right">
                     <div className="text-xs uppercase tracking-[0.16em] text-white/50">
-                      Full-day packages
+                      Half day / Full day
                     </div>
                     <div className="mt-1 text-sm text-white/80">
-                      Custom rates on request
+                      {naira(halfDay)} · {naira(fullDay)}
                     </div>
                   </div>
                 </div>
@@ -82,7 +94,7 @@ export function Pricing() {
                 <a href="/booking">Reserve your date</a>
               </Button>
               <p className="mt-3 flex items-center justify-center gap-2 text-[11px] text-muted-foreground">
-                <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" /> Secure payment via Nomba · All prices ex. VAT (7.5% VAT applies)
+                <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" /> Secure payment via Nomba · All prices ex. VAT ({config.vatRate}% VAT applies)
               </p>
             </div>
           </div>

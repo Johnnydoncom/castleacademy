@@ -1,4 +1,6 @@
 import React from "react";
+import { loadPricingConfig } from "@/lib/pricing-config-store";
+import { describeMultiDayTiers } from "@/lib/pricing-config";
 import {
   RefreshCw,
   Tag,
@@ -11,7 +13,17 @@ import {
 } from "lucide-react";
 import { CANCELLATION_TIERS } from "@/lib/policy";
 
-export function PoliciesAndIncentives() {
+/**
+ * Incentive figures come from `pricing_config`, the same record the quote is
+ * calculated from, so an admin change to a discount is advertised and charged
+ * consistently. Loyalty and referral terms stay as copy — they are applied by
+ * hand and have no computable rule.
+ */
+export async function PoliciesAndIncentives() {
+  const { config } = await loadPricingConfig();
+  const early = config.earlyBooking;
+  const multiDayText = describeMultiDayTiers(config);
+
   return (
     <section id="policies" className="bg-cream py-16 md:py-24" aria-labelledby="policies-heading">
       <div className="mx-auto max-w-6xl px-5 md:px-8">
@@ -43,11 +55,11 @@ export function PoliciesAndIncentives() {
                 <Tag className="w-6 h-6" />
               </div>
               <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold uppercase tracking-wider mb-3">
-                <Percent className="w-3.5 h-3.5" /> 5% Off
+                <Percent className="w-3.5 h-3.5" /> {early.percent}% Off
               </div>
               <h3 className="font-display text-xl text-ink font-bold">Early Booking Incentive</h3>
               <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-                Get <strong>5% off</strong> your total venue fee when your booking is confirmed and paid at least <strong>14 days in advance</strong>.
+                Get <strong>{early.percent}% off</strong> your total venue fee when your booking is confirmed and paid at least <strong>{early.minDaysAhead} days in advance</strong>.
               </p>
             </div>
             <div className="mt-6 pt-4 border-t border-emerald-100 flex items-center gap-2 text-xs font-medium text-emerald-800">
@@ -87,7 +99,7 @@ export function PoliciesAndIncentives() {
               <ul className="mt-3 space-y-2 text-xs leading-relaxed text-muted-foreground">
                 <li className="flex items-start gap-2">
                   <span className="font-bold text-blue-800 shrink-0">•</span>
-                  <span><strong>Multi-Day:</strong> 5% off 2 consecutive days · 10% off 3–5 days</span>
+                  <span><strong>Multi-Day:</strong> {multiDayText}</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="font-bold text-blue-800 shrink-0">•</span>

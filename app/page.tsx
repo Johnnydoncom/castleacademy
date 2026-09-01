@@ -9,14 +9,28 @@ import { Gallery } from "@/components/gallery";
 import { BookingBanner } from "@/components/booking-banner";
 import { Testimonials } from "@/components/testimonials";
 import { Faq } from "@/components/faq";
-import { FAQ_ITEMS } from "@/lib/faq-data";
+import { buildFaqItems } from "@/lib/faq-data";
+import { loadPricingConfig } from "@/lib/pricing-config-store";
 import { Location } from "@/components/location";
 import { Assistance } from "@/components/assistance";
 import { FinalCTA } from "@/components/final-cta";
 import { Footer } from "@/components/footer";
 
+/**
+ * Prices and incentives on this page are read from `pricing_config`, so it must
+ * not be frozen at build time — an admin price change would never appear.
+ * Saving in /admin/pricing revalidates this path immediately; the window below
+ * is only a safety net in case that ever fails.
+ */
+export const revalidate = 300;
 
-export default function Page() {
+
+export default async function Page() {
+  const { config } = await loadPricingConfig();
+  // Built once and shared, so the accordion and the FAQPage structured data
+  // always advertise the same terms.
+  const faqItems = buildFaqItems(config);
+
   const jsonLd = [
     {
       "@context": "https://schema.org",
@@ -75,7 +89,7 @@ export default function Page() {
     {
       "@context": "https://schema.org",
       "@type": "FAQPage",
-      mainEntity: FAQ_ITEMS.map((item) => ({
+      mainEntity: faqItems.map((item) => ({
         "@type": "Question",
         name: item.question,
         acceptedAnswer: {
@@ -103,7 +117,7 @@ export default function Page() {
         <Gallery />
         <BookingBanner />
         <Testimonials />
-        <Faq />
+        <Faq items={faqItems} />
         <Location />
         <Assistance />
         <FinalCTA />

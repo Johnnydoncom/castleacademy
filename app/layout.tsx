@@ -2,15 +2,20 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
 import { WhatsAppFAB } from "@/components/whatsapp-fab";
+import { loadPricingConfig } from "@/lib/pricing-config-store";
+import { naira } from "@/lib/format-money";
 
-export const metadata: Metadata = {
+const DESCRIPTION_PREFIX =
+  "Book Castle Academy — a modern, fully equipped training venue in Ikeja, Lagos. Seats 24, smart TV, high-speed Wi-Fi, uninterrupted power. Hassle-free bookings from ";
+
+const baseMetadata: Metadata = {
   metadataBase: new URL("https://castleacademy.ng"),
   title: {
     default: "Castle Academy | Premium Training Space Booking, Ikeja Lagos",
     template: "%s | Castle Academy",
   },
   description:
-    "Book Castle Academy — a modern, fully equipped training venue in Ikeja, Lagos. Seats 24, smart TV, high-speed Wi-Fi, uninterrupted power. Hassle-free bookings from ₦100,000.",
+    DESCRIPTION_PREFIX + ".",
   robots: {
     index: true,
     follow: true,
@@ -46,6 +51,19 @@ export const metadata: Metadata = {
     ],
   },
 };
+
+
+/**
+ * The headline rate in the description is read from `pricing_config` so search
+ * results and link previews cannot advertise a price the site no longer charges.
+ */
+export async function generateMetadata(): Promise<Metadata> {
+  const { config } = await loadPricingConfig();
+  return {
+    ...baseMetadata,
+    description: `${DESCRIPTION_PREFIX}${naira(config.packages.hours3)}.`,
+  };
+}
 
 export default function RootLayout({
   children,

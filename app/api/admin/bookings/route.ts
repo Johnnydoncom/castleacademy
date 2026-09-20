@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
+import { randomBytes } from "crypto";
 import { db } from "@/lib/db";
-import { bookings } from "@/lib/db/schema";
+import { bookings, bookingDays } from "@/lib/db/schema";
 import { eq, sql, and, like } from "drizzle-orm";
 import { cookies } from "next/headers";
 
@@ -208,5 +209,140 @@ export async function PATCH(req: Request) {
   } catch (err) {
     console.error("[admin/bookings] PATCH error:", err);
     return NextResponse.json({ error: "Failed to update booking" }, { status: 500 });
+  }
+}
+
+/** Generate a unique booking reference: CA-YYYYMMDD-XXXXXX */
+function generateReference(): string {
+  const now = new Date();
+  const date = now.toISOString().slice(0, 10).replace(/-/g, "");
+  const hex = randomBytes(3).toString("hex").toUpperCase();
+  return `CA-${date}-${hex}`;
+}
+
+/**
+ * POST /api/admin/bookings
+ * Admin-only endpoint to manually create a booking, bypassing payment.
+ * Body: {
+ *   fullName, email, phone, organisation?, eventType, participants,
+ *   extras?, notes?,
+ *   days: [{ date, startTime, endTime }],
+ *   status?: "confirmed" | "pending",
+ *   invoiceTotal?, invoiceSubtotal?, paymentStatus?, paymentMethod?
+ * }
+ */
+export async function POST(req: Request) {
+  if (!(await checkAuth())) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  try {
+    const body = await req.json();
+    const {
+      fullName, organisation, phone, email, eventType,
+      participants, extras, notes,
+      days: rawDays,
+      status = "confirmed",
+      invoiceTotal, invoiceSubtotal,
+      paymentStatus = "unpaid",
+      paymentMethod,
+    } = body;
+
+    // ── Basic validation ────────────────────────────────────────────────────
+    if (!fullName || String(fullName).trim().length < 2) {
+      return NextResponse.json({ error: "Full name is required (min 2 chars)." }, { status: 400 });
+    }
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email))) {
+      return NextResponse.json({ error: "A valid email address is required." }, { status: 400 });
+    }
+    if (!phone || String(phone).trim().length < 5) {
+      return NextResponse.json({ error: "A phone number is required." }, { status: 400 });
+    }
+    if (!Array.isArray(rawDays) || rawDays.length === 0) {
+      return NextResponse.json({ error: "At least one day with date, startTime and endTime is required." }, { status: 400 });
+    }
+
+    // ── Validate each day entry ─────────────────────────────────────────────
+    const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+    const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
+    const parsedDays: { date: string; startTime: string; endTime: string }[] = [];
+    for (const d of rawDays) {
+      if (!d || typeof d !== "object") {
+        return NextResponse.json({ error: "Each day must be an object with date, startTime, endTime." }, { status: 400 });
+      }
+      const date = String(d.date ?? "");
+      const startTime = String(d.startTime ?? "").slice(0, 5);
+      const endTime = String(d.endTime ?? "").slice(0, 5);
+      if (!ISO_DATE.test(date)) {
+        return NextResponse.json({ error: `Invalid date format: ${date}` }, { status: 400 });
+      }
+      if (!HHMM.test(startTime)) {
+        return NextResponse.json({ error: `Invalid startTime format: ${startTime}` }, { status: 400 });
+      }
+      if (!HHMM.test(endTime)) {
+        return NextResponse.json({ error: `Invalid endTime format: ${endTime}` }, { status: 400 });
+      }
+      parsedDays.push({ date, startTime, endTime });
+    }
+    // Sort by date ascending
+    parsedDays.sort((a, b) => a.date.localeCompare(b.date));
+
+    const startDate = parsedDays[0].date;
+    const endDate = parsedDays[parsedDays.length - 1].date;
+    const startTime = parsedDays.reduce((a, d) => (d.startTime < a ? d.startTime : a), "23:59");
+    const endTime = parsedDays.reduce((a, d) => (d.endTime > a ? d.endTime : a), "00:00");
+
+    // ── Generate unique reference ───────────────────────────────────────────
+    let reference = generateReference();
+    for (let i = 0; i < 3; i++) {
+      const existing = await db
+        .select({ id: bookings.id })
+        .from(bookings)
+        .where(eq(bookings.reference, reference))
+        .limit(1);
+      if (existing.length === 0) break;
+      reference = generateReference();
+    }
+
+    // ── Insert booking ──────────────────────────────────────────────────────
+    const [insertResult] = await db.insert(bookings).values({
+      reference,
+      fullName: String(fullName).trim(),
+      organisation: organisation ? String(organisation).trim() : null,
+      phone: String(phone).trim(),
+      email: String(email).trim().toLowerCase(),
+      eventType: String(eventType || "other"),
+      startDate: startDate as any,
+      endDate: endDate as any,
+      startTime,
+      endTime,
+      participants: Number(participants) || 1,
+      extras: Array.isArray(extras) ? extras : [],
+      agreedToPolicy: 1, // admin creates on behalf of customer
+      status: ["pending", "confirmed", "cancelled"].includes(status) ? status : "confirmed",
+      invoiceSubtotal: invoiceSubtotal ? Number(invoiceSubtotal) : null,
+      invoiceVat: null,
+      invoiceTotal: invoiceTotal ? Number(invoiceTotal) : null,
+      paymentStatus: ["unpaid", "paid", "refunded"].includes(paymentStatus) ? paymentStatus : "unpaid",
+      paymentMethod: paymentStatus === "paid" ? (paymentMethod || "manual") : null,
+      paidAt: paymentStatus === "paid" ? sql`NOW()` : null,
+      notes: notes ? String(notes).trim() : null,
+    });
+    const bookingId = Number(insertResult.insertId);
+
+    // ── Insert booking_days ─────────────────────────────────────────────────
+    for (const day of parsedDays) {
+      await db.insert(bookingDays).values({
+        bookingId,
+        dayDate: day.date as any,
+        startTime: day.startTime,
+        endTime: day.endTime,
+      });
+    }
+
+    return NextResponse.json({ success: true, reference, bookingId }, { status: 201 });
+  } catch (err) {
+    console.error("[admin/bookings] POST error:", err);
+    return NextResponse.json({ error: "Failed to create booking" }, { status: 500 });
   }
 }

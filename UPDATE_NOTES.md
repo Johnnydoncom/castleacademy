@@ -1,3 +1,59 @@
+# Castle Academy — Dynamic Gallery (October 2026)
+
+The homepage gallery is now managed from **Admin → Gallery** (`/admin/gallery`),
+open to every admin (not owner-only). Admins can:
+
+- **Upload** images (JPG, PNG, WebP, GIF, AVIF — up to 10 MB) and videos
+  (MP4, MOV, WebM — up to 100 MB), with a caption and an optional "hidden" start.
+- **Show / hide** any item without deleting it.
+- **Reorder** items (arrow buttons) — the homepage follows this order.
+- **Edit captions** inline (saved on blur / Enter) and **delete** items.
+
+Changes appear on the homepage immediately (`revalidatePath("/")`). If every item
+is hidden, the gallery section is left off the homepage.
+
+## Setup
+
+```bash
+npx drizzle-kit migrate   # applies 20261002132714_gallery_items
+```
+
+The migration creates `gallery_items` and seeds it with the six items that used
+to be hardcoded, so the homepage looks the same until an admin changes it.
+If the table is missing or the DB is unreachable, the homepage falls back to
+those same six items.
+
+## Where uploads are stored — read before deploying
+
+Uploads are written to disk in **`storage/gallery/`** (gitignored) and streamed
+back by `GET /api/gallery/media/<file>` (with Range support for video seeking).
+They are not put in `public/`, because `next start` only serves public files
+that existed at build time.
+
+- The folder **must persist across deploys**. If your host replaces the app
+  directory on each release, set `GALLERY_UPLOAD_DIR` to a path outside it, e.g.
+  `GALLERY_UPLOAD_DIR=/home/<user>/castle-uploads/gallery`.
+- This needs a host with a persistent, writable filesystem (cPanel / Passenger
+  Node app, VPS, etc.). It will **not** work on serverless hosts (Vercel,
+  Netlify) without swapping `lib/gallery-storage.ts` for object storage.
+- If a reverse proxy (nginx / Apache / LiteSpeed) sits in front of Node, its
+  request-body limit must allow 100 MB for video uploads
+  (e.g. nginx `client_max_body_size 110m;`).
+
+File types are verified from the file's bytes, not its name or the browser's
+MIME type. SVG is rejected (it can carry script). Uploaded files get random UUID
+names, so URLs can't be guessed and are safe to cache forever.
+
+**New:** `lib/gallery.ts`, `lib/gallery-store.ts`, `lib/gallery-storage.ts`,
+`app/admin/gallery/page.tsx`, `components/admin/gallery-manager.tsx`,
+`app/api/admin/gallery/**`, `app/api/gallery/media/[file]/route.ts`,
+`lib/db/migrations/20261002132714_gallery_items/`.
+**Modified:** `components/gallery.tsx` (data-driven; only the visible video plays;
+counter works past 9 items), `app/page.tsx`, `components/admin/admin-sidebar.tsx`,
+`lib/db/schema.ts`, `.gitignore`.
+
+---
+
 # Castle Academy — Feature Update (July 2026)
 
 This update adds automatic PDF invoicing, a customer self-service portal,

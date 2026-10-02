@@ -11,22 +11,24 @@ import { Testimonials } from "@/components/testimonials";
 import { Faq } from "@/components/faq";
 import { buildFaqItems } from "@/lib/faq-data";
 import { loadPricingConfig } from "@/lib/pricing-config-store";
+import { loadPublishedGallery } from "@/lib/gallery-store";
 import { Location } from "@/components/location";
 import { Assistance } from "@/components/assistance";
 import { FinalCTA } from "@/components/final-cta";
 import { Footer } from "@/components/footer";
 
 /**
- * Prices and incentives on this page are read from `pricing_config`, so it must
- * not be frozen at build time — an admin price change would never appear.
- * Saving in /admin/pricing revalidates this path immediately; the window below
- * is only a safety net in case that ever fails.
+ * Prices and incentives on this page are read from `pricing_config`, and the
+ * gallery from `gallery_items`, so it must not be frozen at build time — an
+ * admin change would never appear. Saving in /admin/pricing or /admin/gallery
+ * revalidates this path immediately; the window below is only a safety net in
+ * case that ever fails.
  */
 export const revalidate = 300;
 
 
 export default async function Page() {
-  const { config } = await loadPricingConfig();
+  const [{ config }, gallery] = await Promise.all([loadPricingConfig(), loadPublishedGallery()]);
   // Built once and shared, so the accordion and the FAQPage structured data
   // always advertise the same terms.
   const faqItems = buildFaqItems(config);
@@ -114,7 +116,7 @@ export default async function Page() {
         <Pricing />
         <PoliciesAndIncentives />
         <How />
-        <Gallery />
+        <Gallery items={gallery} />
         <BookingBanner />
         <Testimonials />
         <Faq items={faqItems} />

@@ -216,3 +216,27 @@ export const pricingConfig = mysqlTable("pricing_config", {
   updatedAt: datetime("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
   updatedBy: text("updated_by"),
 });
+
+// ── gallery_items ─────────────────────────────────────────────────────────────
+// Images and videos shown in the homepage gallery, managed from /admin/gallery.
+// `src` is what the page renders: either a bundled `/images/...` asset (the
+// original seeded items) or `/api/gallery/media/<storageKey>` for an upload.
+// `storageKey` is set only for uploads — it names the file on disk, and its
+// presence is what tells a delete to remove the file too.
+export const galleryItems = mysqlTable(
+  "gallery_items",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    mediaType: varchar("media_type", { length: 10 }).notNull(),
+    src: varchar("src", { length: 500 }).notNull(),
+    storageKey: varchar("storage_key", { length: 255 }).unique(),
+    mimeType: varchar("mime_type", { length: 100 }),
+    sizeBytes: int("size_bytes"),
+    caption: varchar("caption", { length: 200 }).notNull().default(""),
+    sortOrder: int("sort_order").notNull().default(0),
+    isPublished: tinyint("is_published").notNull().default(1),
+    createdAt: datetime("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+    updatedAt: datetime("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (t) => [index("idx_gallery_order").on(t.isPublished, t.sortOrder)]
+);

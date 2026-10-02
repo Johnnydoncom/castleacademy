@@ -37,3 +37,6 @@ next-env.d.ts
 *.sw?
 .env.local
 .env
+
+# Gallery uploads (runtime data, see lib/gallery-storage.ts)
+storage/

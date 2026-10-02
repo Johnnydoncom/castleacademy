@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import { upload as blobUpload } from "@vercel/blob/client";
 import {
+  AlertTriangle,
   ArrowDown,
   ArrowUp,
   ExternalLink,
@@ -37,6 +39,7 @@ import {
   MAX_VIDEO_BYTES,
   formatMb,
   type GalleryItem,
+  type GalleryStorage,
 } from "@/lib/gallery";
 
 async function errorMessage(res: Response, fallback: string): Promise<string> {
@@ -48,10 +51,10 @@ async function errorMessage(res: Response, fallback: string): Promise<string> {
 }
 
 /**
- * XHR rather than fetch so the admin sees upload progress — a 100 MB video on
- * a Lagos connection can take a while.
+ * Disk backend: XHR rather than fetch so the admin sees upload progress — a
+ * 100 MB video on a Lagos connection can take a while.
  */
-function uploadWithProgress(form: FormData, onProgress: (pct: number) => void) {
+function uploadToDisk(form: FormData, onProgress: (pct: number) => void) {
   return new Promise<GalleryItem>((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open("POST", "/api/admin/gallery");
@@ -74,9 +77,54 @@ function uploadWithProgress(form: FormData, onProgress: (pct: number) => void) {
   });
 }
 
+/** Blob filenames: keep them readable but restricted to what the token route accepts. */
+function blobPathname(name: string): string {
+  const dot = name.lastIndexOf(".");
+  const ext = dot > 0 ? name.slice(dot + 1).toLowerCase().replace(/[^a-z0-9]/g, "") : "";
+  const base = (dot > 0 ? name.slice(0, dot) : name)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 60) || "upload";
+  return `gallery/${base}${ext ? `.${ext}` : ""}`;
+}
+
+/**
+ * Vercel Blob backend: the file goes straight from the browser to Blob (so no
+ * Function body limit applies), then we ask the server to verify and record it.
+ */
+async function uploadToBlob(
+  file: File,
+  caption: string,
+  published: boolean,
+  onProgress: (pct: number) => void
+): Promise<GalleryItem> {
+  const blob = await blobUpload(blobPathname(file.name), file, {
+    access: "public",
+    handleUploadUrl: "/api/admin/gallery/upload",
+    clientPayload: file.type.startsWith("video/") ? "video" : "image",
+    contentType: file.type || undefined,
+    onUploadProgress: ({ percentage }) => onProgress(Math.round(percentage)),
+  });
+  onProgress(100);
+  const res = await fetch("/api/admin/gallery", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ blobUrl: blob.url, caption, published }),
+  });
+  if (!res.ok) throw new Error(await errorMessage(res, "Failed to save the upload"));
+  return (await res.json()).item as GalleryItem;
+}
+
 // ── Upload card ──────────────────────────────────────────────────────────────
 
-function UploadCard({ onUploaded }: { onUploaded: (item: GalleryItem) => void }) {
+function UploadCard({
+  storage,
+  onUploaded,
+}: {
+  storage: GalleryStorage | null;
+  onUploaded: (item: GalleryItem) => void;
+}) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
@@ -118,13 +166,18 @@ function UploadCard({ onUploaded }: { onUploaded: (item: GalleryItem) => void })
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!file) return toast.error("Choose a file to upload.");
-    const form = new FormData();
-    form.append("file", file);
-    form.append("caption", caption);
-    form.append("published", String(publish));
     setProgress(0);
     try {
-      const item = await uploadWithProgress(form, setProgress);
+      let item: GalleryItem;
+      if (storage === "blob") {
+        item = await uploadToBlob(file, caption, publish, setProgress);
+      } else {
+        const form = new FormData();
+        form.append("file", file);
+        form.append("caption", caption);
+        form.append("published", String(publish));
+        item = await uploadToDisk(form, setProgress);
+      }
       toast.success(publish ? "Uploaded and live on the homepage" : "Uploaded as hidden");
       onUploaded(item);
       reset();
@@ -135,6 +188,28 @@ function UploadCard({ onUploaded }: { onUploaded: (item: GalleryItem) => void })
   };
 
   const uploading = progress !== null;
+
+  if (storage === "unavailable") {
+    return (
+      <div className="rounded-xl border border-amber-200 bg-amber-50 p-6 text-sm text-amber-900">
+        <div className="flex items-start gap-3">
+          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" aria-hidden="true" />
+          <div className="space-y-2">
+            <h2 className="font-semibold">Uploads need a Vercel Blob store</h2>
+            <p>
+              This site runs on Vercel, where the server can&apos;t keep uploaded files. In the Vercel
+              dashboard, open this project&apos;s <strong>Storage</strong> tab, choose{" "}
+              <strong>Create → Blob</strong> with <strong>Public</strong>
+              {" access, connect it to this project, then redeploy. It's free on the Hobby plan (1 GB)."}
+            </p>
+            <p className="text-amber-800/80">
+              You can still reorder, hide and caption the existing items below.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <form onSubmit={submit} className="rounded-xl border border-border/60 bg-card p-6 shadow-sm">
@@ -234,7 +309,7 @@ function UploadCard({ onUploaded }: { onUploaded: (item: GalleryItem) => void })
             )}
             <Button
               type="submit"
-              disabled={!file || uploading}
+              disabled={!file || uploading || storage === null}
               className="w-full gap-2 bg-gold text-royal-deep shadow-sm hover:bg-gold/90 sm:w-auto"
             >
               {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <UploadCloud className="h-4 w-4" />}
@@ -393,6 +468,7 @@ function ItemCard({
 
 export function GalleryManager() {
   const [items, setItems] = useState<GalleryItem[]>([]);
+  const [storage, setStorage] = useState<GalleryStorage | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -402,7 +478,9 @@ export function GalleryManager() {
     try {
       const res = await fetch("/api/admin/gallery", { cache: "no-store" });
       if (!res.ok) throw new Error(await errorMessage(res, "Failed to load the gallery"));
-      setItems((await res.json()).items ?? []);
+      const data = await res.json();
+      setItems(data.items ?? []);
+      setStorage(data.storage ?? "disk");
       setLoadError(null);
     } catch (err) {
       setLoadError((err as Error).message);
@@ -481,7 +559,7 @@ export function GalleryManager() {
 
   return (
     <div className="max-w-6xl space-y-8">
-      <UploadCard onUploaded={(item) => setItems((prev) => [...prev, item])} />
+      <UploadCard storage={storage} onUploaded={(item) => setItems((prev) => [...prev, item])} />
 
       <section aria-labelledby="gallery-items-heading" className="space-y-4">
         <div className="flex flex-wrap items-end justify-between gap-3">
@@ -552,7 +630,7 @@ export function GalleryManager() {
             <AlertDialogTitle>Delete this {pendingDelete?.type ?? "item"}?</AlertDialogTitle>
             <AlertDialogDescription>
               {pendingDelete?.uploaded
-                ? "It will be removed from the homepage and the uploaded file deleted from the server. This cannot be undone."
+                ? "It will be removed from the homepage and the uploaded file deleted from storage. This cannot be undone."
                 : "It will be removed from the homepage. To keep it but stop showing it, switch it to hidden instead."}
             </AlertDialogDescription>
           </AlertDialogHeader>

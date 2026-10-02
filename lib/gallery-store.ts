@@ -2,7 +2,7 @@ import { db } from "./db";
 import { galleryItems } from "./db/schema";
 import { asc, eq, inArray, sql } from "drizzle-orm";
 import { DEFAULT_GALLERY, type GalleryItem, type GallerySlide, type MediaType } from "./gallery";
-import { deleteUpload, mediaUrl, type StoredUpload } from "./gallery-storage";
+import { deleteStoredFile, type StoredUpload } from "./gallery-storage";
 
 /**
  * Database access for the homepage gallery. Server-only.
@@ -73,7 +73,7 @@ export async function createGalleryItem(
 
   await db.insert(galleryItems).values({
     mediaType: upload.mediaType,
-    src: mediaUrl(upload.storageKey),
+    src: upload.src,
     storageKey: upload.storageKey,
     mimeType: upload.mimeType,
     sizeBytes: upload.sizeBytes,
@@ -116,7 +116,7 @@ export async function deleteGalleryItem(id: number): Promise<boolean> {
   await db.delete(galleryItems).where(eq(galleryItems.id, id));
   // Row first: a leftover file is harmless, a row pointing at nothing is not.
   if (row.storageKey) {
-    await deleteUpload(row.storageKey).catch((err) =>
+    await deleteStoredFile(row.src, row.storageKey).catch((err) =>
       console.error("[gallery] could not delete file", row.storageKey, err)
     );
   }

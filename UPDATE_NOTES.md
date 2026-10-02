@@ -25,27 +25,43 @@ those same six items.
 
 ## Where uploads are stored — read before deploying
 
-Uploads are written to disk in **`storage/gallery/`** (gitignored) and streamed
-back by `GET /api/gallery/media/<file>` (with Range support for video seeking).
-They are not put in `public/`, because `next start` only serves public files
-that existed at build time.
+### On Vercel (production): Vercel Blob — one-time setup
 
-- The folder **must persist across deploys**. If your host replaces the app
-  directory on each release, set `GALLERY_UPLOAD_DIR` to a path outside it, e.g.
-  `GALLERY_UPLOAD_DIR=/home/<user>/castle-uploads/gallery`.
-- This needs a host with a persistent, writable filesystem (cPanel / Passenger
-  Node app, VPS, etc.). It will **not** work on serverless hosts (Vercel,
-  Netlify) without swapping `lib/gallery-storage.ts` for object storage.
-- If a reverse proxy (nginx / Apache / LiteSpeed) sits in front of Node, its
-  request-body limit must allow 100 MB for video uploads
-  (e.g. nginx `client_max_body_size 110m;`).
+Vercel's server filesystem is read-only, so uploads go to **Vercel Blob**
+(free on Hobby: 1 GB storage, 10 GB transfer/month; if a limit is hit Blob
+pauses until the next cycle — you are never billed).
+
+1. Vercel dashboard → this project → **Storage** → **Create** → **Blob**.
+2. Choose **Public** access, connect it to this project (Production + Preview,
+   and Development if you want it locally).
+3. **Redeploy.** This adds `BLOB_READ_WRITE_TOKEN`, which switches the gallery
+   to Blob automatically.
+
+Until then, the Gallery page shows a notice and uploads are disabled (existing
+items can still be hidden, reordered and captioned).
+
+How it works: the browser uploads the file **directly to Blob** using a
+short-lived token from `POST /api/admin/gallery/upload` (admins only, scoped to
+`gallery/`, limited to image/video types and 10 MB / 100 MB). The server then
+checks the stored file's real bytes and size before saving it, and deletes it
+if it fails. Deleting a gallery item deletes the blob.
+
+### Elsewhere (local dev, VPS / cPanel): local disk
+
+Without `BLOB_READ_WRITE_TOKEN` (and not on Vercel), uploads are written to
+**`storage/gallery/`** (gitignored) and streamed back by
+`GET /api/gallery/media/<file>` (with Range support for video seeking).
+
+- The folder must persist across deploys; set `GALLERY_UPLOAD_DIR` to a path
+  outside the app directory if releases replace it.
+- A reverse proxy in front of Node must allow ~110 MB request bodies for videos.
 
 File types are verified from the file's bytes, not its name or the browser's
 MIME type. SVG is rejected (it can carry script). Uploaded files get random UUID
 names, so URLs can't be guessed and are safe to cache forever.
 
 **New:** `lib/gallery.ts`, `lib/gallery-store.ts`, `lib/gallery-storage.ts`,
-`app/admin/gallery/page.tsx`, `components/admin/gallery-manager.tsx`,
+`app/api/admin/gallery/upload/route.ts` (Blob tokens), `app/admin/gallery/page.tsx`, `components/admin/gallery-manager.tsx`,
 `app/api/admin/gallery/**`, `app/api/gallery/media/[file]/route.ts`,
 `lib/db/migrations/20261002132714_gallery_items/`.
 **Modified:** `components/gallery.tsx` (data-driven; only the visible video plays;

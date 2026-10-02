@@ -5,6 +5,9 @@
 
 export type MediaType = "image" | "video";
 
+/** Where uploads go — see lib/gallery-storage.ts. */
+export type GalleryStorage = "blob" | "disk" | "unavailable";
+
 /** What the homepage needs to render one slide. */
 export interface GallerySlide {
   id: number;

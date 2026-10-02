@@ -38,7 +38,6 @@
   --color-ring: var(--ring);
   --color-ring-offset-background: var(--background);
 
-  /* Brand tokens */
   --color-royal: var(--royal);
   --color-royal-deep: var(--royal-deep);
   --color-gold: var(--gold);
@@ -70,13 +69,20 @@
   --radius: 0.75rem;
 
   /* Brand palette — Noir & Gold editorial luxury */
-  --royal: oklch(0.16 0 0);              /* #0d0d0d — noir */
-  --royal-deep: oklch(0.08 0 0);         /* #050505 — jet */
-  --gold: oklch(0.78 0.115 82);          /* #c9a84c */
-  --gold-soft: oklch(0.88 0.09 85);      /* #f0d78c */
-  --ivory: oklch(0.965 0.008 85);        /* #f5f3ee */
-  --cream: oklch(0.985 0.006 85);        /* #fbf9f3 */
-  --ink: oklch(0.15 0 0);                /* #0d0d0d */
+  --royal: oklch(0.16 0 0);
+  /* #0d0d0d — noir */
+  --royal-deep: oklch(0.08 0 0);
+  /* #050505 — jet */
+  --gold: oklch(0.78 0.115 82);
+  /* #c9a84c */
+  --gold-soft: oklch(0.88 0.09 85);
+  /* #f0d78c */
+  --ivory: oklch(0.965 0.008 85);
+  /* #f5f3ee */
+  --cream: oklch(0.985 0.006 85);
+  /* #fbf9f3 */
+  --ink: oklch(0.15 0 0);
+  /* #0d0d0d */
 
 
   /* Semantic mappings */
@@ -142,16 +148,22 @@
   * {
     border-color: var(--color-border);
   }
+
   html {
     scroll-behavior: smooth;
   }
+
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
   }
-  h1, h2, h3, h4 {
+
+  h1,
+  h2,
+  h3,
+  h4 {
     font-family: var(--font-display);
     font-optical-sizing: auto;
     letter-spacing: -0.01em;
@@ -172,6 +184,7 @@
 
 @utility grain {
   position: relative;
+
   &::after {
     content: "";
     position: absolute;
@@ -185,6 +198,7 @@
 
 @utility no-scrollbar {
   scrollbar-width: none;
+
   &::-webkit-scrollbar {
     display: none;
   }
@@ -195,6 +209,7 @@
     transform: scale(1);
     opacity: 0.8;
   }
+
   100% {
     transform: scale(1.5);
     opacity: 0;

@@ -57,7 +57,7 @@ export function AdminSidebar() {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 px-3 py-4 space-y-0.5">
+      <nav className="flex-1 min-h-0 overflow-y-auto px-3 py-4 space-y-0.5">
         <p className="px-3 mb-2 text-[10px] font-semibold uppercase tracking-widest text-zinc-500">
           Management
         </p>

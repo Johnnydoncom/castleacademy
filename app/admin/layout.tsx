@@ -17,9 +17,13 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
+    // The shell is pinned to the viewport so only the content pane scrolls and
+    // the sidebar stays put. `relative` on the pane matters: without it,
+    // absolutely positioned descendants (sr-only labels, Radix's hidden native
+    // <select>) escape the pane and stretch the document, scrolling the whole page.
+    <div className="fixed inset-0 flex overflow-hidden bg-background">
       <AdminSidebar />
-      <div className="flex-1 flex flex-col min-w-0 overflow-y-auto">
+      <div className="relative flex-1 flex flex-col min-w-0 overflow-y-auto overscroll-contain">
         {children}
       </div>
     </div>

@@ -11,6 +11,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { OPTIONAL_EXTRAS } from "@/lib/booking-schema";
 import {
   DEFAULT_PRICING_CONFIG,
+  PACKAGE_KEYS,
+  describePromoWindow,
+  effectiveRates,
+  promoStatus,
+  type PackageRates,
   type PricingConfig,
 } from "@/lib/pricing-config";
 
@@ -121,6 +126,105 @@ function PercentField({
   );
 }
 
+const PACKAGE_LABELS: Record<(typeof PACKAGE_KEYS)[number], string> = {
+  hours3: "3 hours",
+  halfDay: "4 hours (half day)",
+  fullDay: "Full day (8 hours)",
+  extraHour: "Each extra hour",
+};
+
+/**
+ * What the owner is about to publish, in one line.
+ *
+ * A sale that is switched on but priced at or above the standard rate changes
+ * nothing, and silently doing nothing is the worst possible outcome here — so
+ * "no-effect" is called out as plainly as "running".
+ */
+function PromoStatusLine({ config }: { config: PricingConfig }) {
+  const status = promoStatus(config);
+  const window = describePromoWindow(config.promo);
+
+  const copy: Record<typeof status, { text: string; className: string }> = {
+    off: {
+      text: "Switched off — every booking is charged the standard package rate.",
+      className: "border-border bg-muted/40 text-muted-foreground",
+    },
+    scheduled: {
+      text: `Scheduled — standard rates apply until the window opens. ${window}`,
+      className: "border-sky-200 bg-sky-50 text-sky-900",
+    },
+    running: {
+      text: `Live now — new bookings are being charged the promo rate. ${window}`,
+      className: "border-emerald-200 bg-emerald-50 text-emerald-900",
+    },
+    ended: {
+      text: `Ended — standard rates have resumed. ${window}`,
+      className: "border-border bg-muted/40 text-muted-foreground",
+    },
+    "no-effect": {
+      text:
+        "On, but changing nothing — no promo rate is lower than its standard rate, so customers still pay full price.",
+      className: "border-amber-300 bg-amber-50 text-amber-900",
+    },
+  };
+
+  const { text, className } = copy[status];
+  return (
+    <p className={`mt-4 rounded-lg border px-3.5 py-2.5 text-xs leading-relaxed ${className}`}>
+      {text}
+    </p>
+  );
+}
+
+/** Standard vs promo, with the saving — what the customer will actually see. */
+function PromoPreview({ config }: { config: PricingConfig }) {
+  // Previewed as though the window were open, so the owner can check the
+  // figures before the sale starts rather than after.
+  const openToday = { ...config, promo: { ...config.promo, startDate: "", endDate: "" } };
+  const rates = effectiveRates(openToday);
+  if (!rates.active) return null;
+
+  return (
+    <div className="mt-4 overflow-hidden rounded-lg border border-border">
+      <table className="w-full text-xs">
+        <thead className="bg-muted/50 text-muted-foreground">
+          <tr>
+            <th className="px-3 py-2 text-left font-medium">Package</th>
+            <th className="px-3 py-2 text-right font-medium">Standard</th>
+            <th className="px-3 py-2 text-right font-medium">Promo</th>
+            <th className="px-3 py-2 text-right font-medium">Saving</th>
+          </tr>
+        </thead>
+        <tbody>
+          {PACKAGE_KEYS.map((key) => {
+            const was = rates.standard[key];
+            const now = rates.packages[key];
+            const changed = now < was;
+            return (
+              <tr key={key} className="border-t border-border">
+                <td className="px-3 py-2 text-foreground">{PACKAGE_LABELS[key]}</td>
+                <td
+                  className={`px-3 py-2 text-right tabular-nums ${
+                    changed ? "text-muted-foreground line-through" : "text-foreground"
+                  }`}
+                >
+                  {naira(was)}
+                </td>
+                <td className="px-3 py-2 text-right tabular-nums font-medium text-emerald-700">
+                  {changed ? naira(now) : "—"}
+                </td>
+                <td className="px-3 py-2 text-right tabular-nums text-emerald-700">
+                  {changed ? `${Math.round(((was - now) / was) * 100)}%` : "—"}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 export function PricingSettings() {
   const [config, setConfig] = useState<PricingConfig>(DEFAULT_PRICING_CONFIG);
   const [loading, setLoading] = useState(true);
@@ -177,6 +281,12 @@ export function PricingSettings() {
   const p = config.packages;
   const m = config.mondaySpecial;
   const t = config.tuesdayDeal;
+  // An existing saved config predates this field, so guard the read rather than
+  // letting the editor crash on a row written before the promo shipped.
+  const promo = config.promo ?? DEFAULT_PRICING_CONFIG.promo;
+  // What a customer would be charged right now — promo included only if its
+  // window is actually open today, so the example never over-promises.
+  const liveRates = effectiveRates({ ...config, promo });
 
   return (
     <div className="space-y-5">
@@ -195,6 +305,124 @@ export function PricingSettings() {
             hint="Added per hour beyond 8."
             onChange={(v) => patch("packages", { ...p, extraHour: v })} />
         </div>
+      </Section>
+
+      <Section
+        title="Promotional pricing (sale)"
+        description="A time-boxed sale price for the packages above. The window is judged against the day the booking is made, not the day of the event — book during the sale and you keep the rate whenever your event falls."
+      >
+        <div className="flex items-center gap-3">
+          <Switch
+            id="promo-enabled"
+            checked={promo.enabled}
+            onCheckedChange={(v) => patch("promo", { ...promo, enabled: v })}
+          />
+          <Label htmlFor="promo-enabled" className="text-sm">
+            Run a promotion
+          </Label>
+        </div>
+
+        {promo.enabled && (
+          <div className="mt-4 space-y-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <Label htmlFor="promo-name" className="text-xs text-muted-foreground">
+                  Promotion name
+                </Label>
+                <Input
+                  id="promo-name"
+                  value={promo.name}
+                  maxLength={60}
+                  placeholder="November Sale"
+                  className="mt-1.5 h-11"
+                  onChange={(e) => patch("promo", { ...promo, name: e.target.value })}
+                />
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  Shown on the banner and on every quote line it discounts.
+                </p>
+              </div>
+              <div>
+                <Label htmlFor="promo-blurb" className="text-xs text-muted-foreground">
+                  Banner message
+                </Label>
+                <Input
+                  id="promo-blurb"
+                  value={promo.blurb}
+                  maxLength={160}
+                  placeholder="Book any session this month and save."
+                  className="mt-1.5 h-11"
+                  onChange={(e) => patch("promo", { ...promo, blurb: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <Label htmlFor="promo-start" className="text-xs text-muted-foreground">
+                  Starts
+                </Label>
+                <Input
+                  id="promo-start"
+                  type="date"
+                  value={promo.startDate}
+                  className="mt-1.5 h-11"
+                  onChange={(e) => patch("promo", { ...promo, startDate: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label htmlFor="promo-end" className="text-xs text-muted-foreground">
+                  Ends
+                </Label>
+                <Input
+                  id="promo-end"
+                  type="date"
+                  value={promo.endDate}
+                  min={promo.startDate || undefined}
+                  className="mt-1.5 h-11"
+                  onChange={(e) => patch("promo", { ...promo, endDate: e.target.value })}
+                />
+              </div>
+              <p className="text-[11px] text-muted-foreground sm:col-span-2">
+                Both dates are inclusive and read in Lagos time. Leave a date
+                empty to leave that side open-ended.
+              </p>
+            </div>
+
+            <div>
+              <p className="text-xs font-medium text-foreground">Promo rates</p>
+              <div className="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                {PACKAGE_KEYS.map((key) => (
+                  <MoneyField
+                    key={key}
+                    id={`promo-${key}`}
+                    label={PACKAGE_LABELS[key]}
+                    value={promo.packages[key]}
+                    hint={`Standard ${naira(p[key])}. Leave at 0 to keep it.`}
+                    onChange={(v) =>
+                      patch("promo", {
+                        ...promo,
+                        packages: { ...promo.packages, [key]: v } as PackageRates,
+                      })
+                    }
+                  />
+                ))}
+              </div>
+            </div>
+
+            <PromoPreview config={{ ...config, promo }} />
+
+            <p className="flex items-start gap-2 text-xs leading-relaxed text-muted-foreground">
+              <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+              A promo rate is only used where it is lower than the standard rate,
+              so a blank or mistyped figure can never raise what a customer pays.
+              On a Monday the promo and the Monday Special compete and the cheaper
+              one wins; the multi-day and early-booking percentages still come off
+              on top.
+            </p>
+          </div>
+        )}
+
+        <PromoStatusLine config={{ ...config, promo }} />
       </Section>
 
       <Section
@@ -417,9 +645,17 @@ export function PricingSettings() {
         <p className="text-xs text-muted-foreground">
           Example: a single 3-hour weekday booking costs{" "}
           <strong className="text-foreground">
-            {naira(Math.round(p.hours3 * (1 + config.vatRate / 100)))}
+            {naira(Math.round(liveRates.packages.hours3 * (1 + config.vatRate / 100)))}
           </strong>{" "}
-          including VAT.
+          including VAT
+          {liveRates.active && (
+            <>
+              {" "}
+              at the {liveRates.name} rate — was{" "}
+              {naira(Math.round(p.hours3 * (1 + config.vatRate / 100)))}
+            </>
+          )}
+          .
         </p>
         <Button onClick={save} disabled={saving} className="h-11 gap-2">
           {saving ? (

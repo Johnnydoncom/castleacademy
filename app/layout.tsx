@@ -3,6 +3,7 @@ import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
 import { WhatsAppFAB } from "@/components/whatsapp-fab";
 import { loadPricingConfig } from "@/lib/pricing-config-store";
+import { effectiveRates } from "@/lib/pricing-config";
 import { naira } from "@/lib/format-money";
 
 const DESCRIPTION_PREFIX =
@@ -59,9 +60,12 @@ const baseMetadata: Metadata = {
  */
 export async function generateMetadata(): Promise<Metadata> {
   const { config } = await loadPricingConfig();
+  // The rate in force today, so a link preview shared during a sale quotes the
+  // sale price and reverts on its own when the window closes.
+  const { packages } = effectiveRates(config);
   return {
     ...baseMetadata,
-    description: `${DESCRIPTION_PREFIX}${naira(config.packages.hours3)}.`,
+    description: `${DESCRIPTION_PREFIX}${naira(packages.hours3)}.`,
   };
 }
 

@@ -2,12 +2,15 @@ import Link from "next/link";
 import { ArrowRight, Calendar, CheckCircle2, ShieldCheck, Clock, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { loadPricingConfig } from "@/lib/pricing-config-store";
+import { effectiveRates } from "@/lib/pricing-config";
 import { naira } from "@/lib/format-money";
 
 /** Rates read from `pricing_config` so this banner cannot advertise a stale price. */
 export async function BookingBanner() {
   const { config } = await loadPricingConfig();
-  const { hours3, extraHour } = config.packages;
+  const rates = effectiveRates(config);
+  const { hours3, extraHour } = rates.packages;
+  const promo = rates.active;
 
   return (
     <section id="book" className="bg-ivory py-20 md:py-28" aria-labelledby="booking-banner-heading">
@@ -83,10 +86,23 @@ export async function BookingBanner() {
             <div className="relative rounded-2xl border border-white/15 bg-white/5 p-6 md:p-8 backdrop-blur-md space-y-6">
               <div className="space-y-2">
                 <div className="text-xs uppercase tracking-widest text-gold font-semibold flex items-center gap-1.5">
-                  <Calendar className="w-4 h-4" /> Standard Rate
+                  {promo ? (
+                    <>
+                      <Sparkles className="w-4 h-4" /> {rates.name}
+                    </>
+                  ) : (
+                    <>
+                      <Calendar className="w-4 h-4" /> Standard Rate
+                    </>
+                  )}
                 </div>
-                <div className="flex items-baseline gap-2">
+                <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
                   <span className="font-display text-4xl md:text-5xl text-white font-bold">{naira(hours3)}</span>
+                  {promo && hours3 < rates.standard.hours3 && (
+                    <span className="font-display text-xl text-white/40 line-through">
+                      {naira(rates.standard.hours3)}
+                    </span>
+                  )}
                   <span className="text-xs text-gold/80">(excl. VAT)</span>
                 </div>
                 <p className="text-xs text-white/70">For up to 3 hours of dedicated venue time</p>

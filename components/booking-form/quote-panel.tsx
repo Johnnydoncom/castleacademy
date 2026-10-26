@@ -126,6 +126,17 @@ export function QuotePanel({
               {participants ? ` · ${participants} people` : ""}
             </p>
 
+            {/* The promo is already baked into the day lines below; this says
+                plainly what it took off, which the line labels alone don't. */}
+            {quote.promoName && quote.promoSavings ? (
+              <p className="mt-3 flex flex-wrap items-center gap-x-2 rounded-lg border border-gold/30 bg-gold/10 px-3 py-2 text-[11px] text-gold-soft">
+                <span className="font-semibold uppercase tracking-[0.12em] text-gold">
+                  {quote.promoName}
+                </span>
+                <span>saves you {naira(quote.promoSavings)} before VAT</span>
+              </p>
+            ) : null}
+
             <dl className="mt-5 space-y-2.5 text-sm">
               {quote.lines.map((line, i) => (
                 <div key={i} className="flex items-baseline justify-between gap-4">

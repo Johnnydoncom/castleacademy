@@ -41,6 +41,9 @@ export interface Quote {
   /** Any booked day falls on a Friday — show the community-rate note. */
   hasFriday?: boolean;
   fridayCommunityNote?: string;
+  /** Set when a running promotion lowered these rates. */
+  promoName?: string;
+  promoSavings?: number;
 }
 
 export type QuoteState =

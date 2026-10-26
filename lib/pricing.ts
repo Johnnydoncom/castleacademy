@@ -8,7 +8,14 @@ import {
   type DaySchedule,
 } from "./booking-schema";
 import { loadPricingConfig } from "./pricing-config-store";
-import { type PricingConfig } from "./pricing-config";
+import {
+  effectiveRates,
+  lagosToday,
+  type EffectiveRates,
+  type PackageRates,
+  type PricingConfig,
+} from "./pricing-config";
+import { naira } from "./format-money";
 
 /**
  * The pricing engine. Server-only.
@@ -84,6 +91,10 @@ export interface PricingResult {
   extrasPriced: boolean;
   /** True when any booked day is a Friday, so the community-rate note shows. */
   hasFriday?: boolean;
+  /** Name of the promotion that lowered these rates, when one did. */
+  promoName?: string;
+  /** What the promotion took off, pre-VAT, versus the standard rates. */
+  promoSavings?: number;
 }
 
 export type BarePricing = Omit<PricingResult, "quoteId" | "source">;
@@ -175,12 +186,17 @@ function weekdayOf(iso: string): number {
   return new Date(Date.UTC(y, m - 1, d)).getUTCDay();
 }
 
-/** Standard package tier for a duration, ignoring weekday specials. */
+/**
+ * Package tier for a duration, ignoring weekday specials.
+ *
+ * Takes the rates rather than the whole config so the same function prices both
+ * at standard rates and at promotional ones — which is what lets the engine
+ * compare the two and charge the lower.
+ */
 function standardTier(
   hours: number,
-  cfg: PricingConfig
+  p: PackageRates
 ): { price: number; label: string } {
-  const p = cfg.packages;
   if (hours <= 3) return { price: p.hours3, label: "3 Hours" };
   if (hours <= 4) return { price: p.halfDay, label: "Half Day (4 Hours)" };
   if (hours <= 8) return { price: p.fullDay, label: "Full Day (8 Hours)" };
@@ -192,31 +208,51 @@ function standardTier(
 }
 
 /**
- * Price for one day, applying any weekday special.
+ * Price for one day, applying the promotional rate and any weekday special.
  *
  * Weekday specials are alternative RATES, not percentage discounts, so they
- * replace the base tier price. Percentage discounts (multi-day, early booking)
- * then apply to the total on top.
+ * replace the base tier price. A promotion is also an alternative rate, so the
+ * two compete rather than stack: the day is charged at whichever is lower and
+ * the line names the one that won. Percentage discounts (multi-day, early
+ * booking) then apply to the total on top of that.
  */
 function priceDay(
   day: DaySchedule,
-  cfg: PricingConfig
-): { price: number; label: string; special: string | null } {
+  cfg: PricingConfig,
+  rates: EffectiveRates
+): { price: number; label: string; special: string | null; promo: string | null } {
   const hours = durationHours(day.startTime, day.endTime);
   const dow = weekdayOf(day.date);
-  const standard = standardTier(hours, cfg);
+  const tier = standardTier(hours, rates.packages);
+
+  /** The promo's name when it genuinely lowered this tier, else null. */
+  const promoOn = (h: number): string | null =>
+    rates.active &&
+    standardTier(h, rates.packages).price < standardTier(h, rates.standard).price
+      ? rates.name
+      : null;
+
+  /** Charge the weekday special or the promotional tier — whichever is less. */
+  const cheaperOf = (
+    specialPrice: number,
+    specialName: string,
+    specialLabel: string
+  ) =>
+    specialPrice <= tier.price
+      ? { price: specialPrice, label: specialLabel, special: specialName, promo: null }
+      : { price: tier.price, label: tier.label, special: null, promo: promoOn(hours) };
 
   // ── Monday Special ───────────────────────────────────────────────────────
   if (dow === 1 && cfg.mondaySpecial.enabled) {
     const ms = cfg.mondaySpecial;
     if (hours <= 3) {
-      return { price: ms.hours3, label: "3 Hours", special: "Monday Special" };
+      return cheaperOf(ms.hours3, "Monday Special", "3 Hours");
     }
     // The published line reads "Full Day: ₦160,000 – 10am To 3pm", so the rate
     // is tied to that exact window rather than to any long Monday booking.
     if (day.startTime === ms.windowStart && day.endTime === ms.windowEnd) {
       // The line already shows the times, so don't repeat the window here.
-      return { price: ms.windowRate, label: "Full Day", special: "Monday Special" };
+      return cheaperOf(ms.windowRate, "Monday Special", "Full Day");
     }
   }
 
@@ -225,17 +261,22 @@ function priceDay(
     const td = cfg.tuesdayDeal;
     const covered = td.qualifyingHours + td.freeHours;
     if (hours > td.qualifyingHours && hours <= covered) {
-      // Charged as though only the qualifying hours were booked.
-      const charged = standardTier(td.qualifyingHours, cfg);
+      // Charged as though only the qualifying hours were booked — at whichever
+      // rates are in force, so during a promo the free hours come off the
+      // promotional rate rather than the standard one. The deal reshapes which
+      // tier is charged; the promo sets what that tier costs, so unlike the
+      // Monday rates these two are not alternatives and both apply.
+      const charged = standardTier(td.qualifyingHours, rates.packages);
       return {
         price: charged.price,
         label: charged.label,
         special: `Tuesday Value Deal — ${td.freeHours} hour${td.freeHours === 1 ? "" : "s"} free`,
+        promo: promoOn(td.qualifyingHours),
       };
     }
   }
 
-  return { price: standard.price, label: standard.label, special: null };
+  return { price: tier.price, label: tier.label, special: null, promo: promoOn(hours) };
 }
 
 function formatDayLabel(iso: string): string {
@@ -256,27 +297,49 @@ function formatDayLabel(iso: string): string {
  * Percentage discounts do not stack: the single largest applicable one wins.
  * The price list does not say they combine, and not stacking is the safer read.
  */
-export function computePrice(input: PricingInput, cfg: PricingConfig): BarePricing {
+export function computePrice(
+  input: PricingInput,
+  cfg: PricingConfig,
+  today: string = lagosToday()
+): BarePricing {
   const days = sortDays(input.days);
+  // Whether a promotion is running is decided by the day the booking is made,
+  // not the day of the event, so this is resolved once here and threaded
+  // through — a booking cannot be priced half in the sale and half out of it.
+  const rates = effectiveRates(cfg, today);
+  // The same rates with the promotion switched off, so the saving is measured
+  // by re-running the real pricing rather than by subtracting tier figures that
+  // a weekday special may have replaced anyway.
+  const listRates: EffectiveRates = {
+    packages: rates.standard,
+    standard: rates.standard,
+    active: false,
+    name: "",
+  };
 
   const lines: QuoteLine[] = [];
   let baseSubtotal = 0;
+  let listSubtotal = 0;
   let totalHours = 0;
   const specials = new Set<string>();
 
   for (const day of days) {
     const hours = durationHours(day.startTime, day.endTime);
-    const { price, label, special } = priceDay(day, cfg);
+    const { price, label, special, promo } = priceDay(day, cfg, rates);
     totalHours += hours;
     baseSubtotal += price;
+    listSubtotal += rates.active ? priceDay(day, cfg, listRates).price : price;
     if (special) specials.add(special);
     lines.push({
       label:
         `${formatDayLabel(day.date)} · ${day.startTime}–${day.endTime} · ${label}` +
-        (special ? ` · ${special}` : ""),
+        [promo, special].filter(Boolean).map((s) => ` · ${s}`).join(""),
       amount: price,
     });
   }
+
+  const promoSavings = Math.max(0, listSubtotal - baseSubtotal);
+  const promoApplied = rates.active && promoSavings > 0;
 
   // ── Percentage discounts — largest single one wins ────────────────────────
   const dates = days.map((d) => d.date);
@@ -317,6 +380,11 @@ export function computePrice(input: PricingInput, cfg: PricingConfig): BarePrici
 
   const dayWord = `${days.length} day${days.length === 1 ? "" : "s"}`;
   const parts = [`${dayWord}, ${totalHours} hours total`];
+  if (promoApplied) {
+    // Named in the stored breakdown so an invoice raised during a sale explains
+    // its own figures months later, when the promo is long over.
+    parts.push(`${rates.name} — saving ${naira(promoSavings)} before VAT`);
+  }
   if (specials.size > 0) parts.push([...specials].join("; "));
   if (discountAmount > 0) parts.push(`less ${discountPct}% (${discountApplied})`);
 
@@ -335,6 +403,7 @@ export function computePrice(input: PricingInput, cfg: PricingConfig): BarePrici
     extrasPriced: Object.keys(cfg.extraPrices).length > 0,
     /** Days that fall on a Friday, so the caller can show the community note. */
     hasFriday: dates.some((d) => weekdayOf(d) === 5),
+    ...(promoApplied ? { promoName: rates.name, promoSavings } : {}),
   };
 }
 
@@ -378,7 +447,14 @@ export async function getOrCreateQuote(
   input: PricingInput
 ): Promise<PricingResult> {
   const { config, hash } = await loadPricingConfig();
-  const quoteId = await computeQuoteId(input, hash);
+
+  // The promo's rates are already inside `hash`, but whether its window is OPEN
+  // changes with the calendar alone — no config edit, so no hash change. Without
+  // this, a quote cached on the last day of a sale would be served back, at the
+  // sale price, for as long as the identical booking kept being requested.
+  const today = lagosToday();
+  const promoKey = effectiveRates(config, today).active ? "promo:on" : "promo:off";
+  const quoteId = await computeQuoteId(input, `${hash}|${promoKey}`);
 
   // Imported lazily so this module stays usable without a database.
   const { readQuote, writeQuote } = await import("./quote-store");
@@ -387,7 +463,9 @@ export async function getOrCreateQuote(
   if (cached) return cached;
 
   const result: PricingResult = {
-    ...computePrice(input, config),
+    // Same `today` the cache key was built from, so the key and the figures it
+    // stores can never disagree across a midnight boundary.
+    ...computePrice(input, config, today),
     quoteId,
     source: "deterministic",
   };

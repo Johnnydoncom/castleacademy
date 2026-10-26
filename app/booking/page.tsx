@@ -2,10 +2,21 @@ import Link from "next/link";
 import { ArrowLeft, MessageCircle, ShieldCheck } from "lucide-react";
 import { Logo } from "@/components/logo";
 import { Booking } from "@/components/booking";
+import { PromoBanner } from "@/components/promo-banner";
+
+/**
+ * Reads `pricing_config` for the promotional banner, so it must not be frozen
+ * at build time — a sale switched on in /admin/pricing would never appear.
+ * Saving there revalidates this path immediately; this window is the safety net,
+ * and is also what retires the banner the day the promo window closes.
+ */
+export const revalidate = 300;
 
 export default function BookingPage() {
   return (
     <div className="min-h-screen bg-ivory text-ink flex flex-col">
+      <PromoBanner />
+
       {/* Top Header Navigation */}
       <header className="sticky top-0 z-40 border-b border-gold/20 bg-royal-deep text-white shadow-md">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-5 py-4 md:px-8">

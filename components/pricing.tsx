@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
-import { CheckCircle2, ShieldCheck, Star } from "lucide-react";
+import { CheckCircle2, ShieldCheck, Star, Sparkles } from "lucide-react";
 import { loadPricingConfig } from "@/lib/pricing-config-store";
+import { describePromoWindow, effectiveRates } from "@/lib/pricing-config";
 import { naira } from "@/lib/format-money";
 
 /**
@@ -8,10 +9,17 @@ import { naira } from "@/lib/format-money";
  * calculated from and the owner edits at /admin/pricing. They used to be
  * hardcoded here, so an admin price change updated what customers were charged
  * while this section kept advertising the old figure.
+ *
+ * While a promotion is running the sale rates are shown with the standard ones
+ * struck through, from the same `effectiveRates` the engine prices with — so
+ * the figure advertised here is the figure charged at checkout.
  */
 export async function Pricing() {
   const { config } = await loadPricingConfig();
-  const { hours3, halfDay, fullDay, extraHour } = config.packages;
+  const rates = effectiveRates(config);
+  const { hours3, halfDay, fullDay, extraHour } = rates.packages;
+  const promo = rates.active;
+  const was = rates.standard;
 
   return (
     <section id="pricing" className="bg-ivory py-20 md:py-28" aria-labelledby="pricing-heading">
@@ -33,18 +41,36 @@ export async function Pricing() {
             <div className="relative overflow-hidden bg-royal p-8 text-white md:p-12">
               <div className="absolute inset-0 grain opacity-30" />
               <div className="relative">
-                <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.16em] text-gold-soft">
-                  <Star className="h-3 w-3 fill-gold text-gold" aria-hidden="true" /> Standard Booking
-                </div>
-                <div className="mt-8 flex items-baseline gap-2">
+                {promo ? (
+                  <div className="inline-flex items-center gap-2 rounded-full bg-gold px-3 py-1 text-[11px] font-bold uppercase tracking-[0.16em] text-royal-deep">
+                    <Sparkles className="h-3 w-3" aria-hidden="true" /> {rates.name}
+                  </div>
+                ) : (
+                  <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.16em] text-gold-soft">
+                    <Star className="h-3 w-3 fill-gold text-gold" aria-hidden="true" /> Standard Booking
+                  </div>
+                )}
+                <div className="mt-8 flex flex-wrap items-baseline gap-x-3 gap-y-1">
                   <span className="font-display text-5xl leading-none text-white md:text-6xl">
                     {naira(hours3)}
                   </span>
+                  {promo && hours3 < was.hours3 && (
+                    <span className="font-display text-2xl leading-none text-white/40 line-through">
+                      {naira(was.hours3)}
+                    </span>
+                  )}
                   <span className="text-sm font-medium text-gold/80">(exclusive of VAT)</span>
                 </div>
                 <p className="mt-2 text-sm text-white/70">
                   for up to 3 hours of dedicated venue time
                 </p>
+                {promo && (
+                  <p className="mt-3 inline-flex items-center rounded-lg border border-gold/30 bg-gold/10 px-3 py-1.5 text-[11px] leading-relaxed text-gold-soft">
+                    {[config.promo.blurb, describePromoWindow(config.promo)]
+                      .filter(Boolean)
+                      .join(" · ") || "Limited-time rate"}
+                  </p>
+                )}
                 <div className="mt-10 h-px w-full bg-white/10" />
                 <div className="mt-6 flex items-center justify-between">
                   <div>
@@ -53,6 +79,11 @@ export async function Pricing() {
                     </div>
                     <div className="mt-1 font-display text-2xl text-gold">
                       {naira(extraHour)}{" "}
+                      {promo && extraHour < was.extraHour && (
+                        <span className="text-base font-normal text-white/40 line-through">
+                          {naira(was.extraHour)}
+                        </span>
+                      )}{" "}
                       <span className="text-sm font-normal text-gold/70">(excl. VAT)</span>
                     </div>
                   </div>
@@ -63,6 +94,11 @@ export async function Pricing() {
                     <div className="mt-1 text-sm text-white/80">
                       {naira(halfDay)} · {naira(fullDay)}
                     </div>
+                    {promo && (halfDay < was.halfDay || fullDay < was.fullDay) && (
+                      <div className="text-xs text-white/40 line-through">
+                        {naira(was.halfDay)} · {naira(was.fullDay)}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

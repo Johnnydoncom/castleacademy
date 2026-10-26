@@ -7,6 +7,7 @@ import { PoliciesAndIncentives } from "@/components/policies-incentives";
 import { How } from "@/components/how";
 import { Gallery } from "@/components/gallery";
 import { BookingBanner } from "@/components/booking-banner";
+import { PromoBanner } from "@/components/promo-banner";
 import { Testimonials } from "@/components/testimonials";
 import { Faq } from "@/components/faq";
 import { buildFaqItems } from "@/lib/faq-data";
@@ -108,6 +109,7 @@ export default async function Page() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
+      <PromoBanner />
       <Nav />
       <main>
         <Hero />
